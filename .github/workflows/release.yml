@@ -33,4 +33,4 @@ jobs:
         run: |
           python -m twine upload dist/* \
             -u __token__ \
-            -p ${{ secrets.TEST_PYPI_API_TOKEN }}
+            -p ${{ secrets.PYPI_API_TOKEN }}
