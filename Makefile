@@ -18,4 +18,4 @@ format:
 	$(PYTHON) -m ruff format .
 
 test:
-	$(PYTHON) -m pytest tests/ -v
+	$(PYTHON) -m pytest test/ -v

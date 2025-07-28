@@ -42,7 +42,7 @@ jobs:
     
     - name: Run tests
       run: |
-        pytest --maxfail=1 --disable-warnings -q
+        make test
     
     - name: Upload coverage reports
       if: matrix.python-version == '3.11'
