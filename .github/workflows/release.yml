@@ -1,0 +1,36 @@
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+  id-token: write 
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tools
+        run: |
+          pip install build twine
+
+      - name: Build the package
+        run: |
+          python -m build
+
+      - name: Publish package to PyPI
+        run: |
+          python -m twine upload dist/* \
+            -u __token__ \
+            -p ${{ secrets.TEST_PYPI_API_TOKEN }}

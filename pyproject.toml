@@ -1,15 +1,46 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "mcp-server-public-transport"
 version = "0.1.0"
-description = "Add your description here"
+description = "An MCP-compatible server for querying public transport data in Europe (UK, CH, BE)."
 readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Miro Duman", email = "dumanmiro@gmail.com" }
+]
+keywords = ["mcp", "public transport", "api", "europe", "fastmcp"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Libraries",
+]
 dependencies = [
     "aiohttp>=3.12.14",
     "certifi>=2025.7.14",
     "fastmcp>=2.10.6",
-    "pytest>=8.4.1",
-    "pytest-asyncio>=1.1.0",
     "python-dotenv>=1.1.1",
     "requests>=2.32.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+    "ruff>=0.4.5",      
+]
+
+[project.urls]
+Homepage = "https://github.com/mirodn/mcp-server-public-transport"
+Repository = "https://github.com/mirodn/mcp-server-public-transport"
+
+[tool.pytest.ini_options]
+addopts = "--maxfail=1 --disable-warnings -q"
+testpaths = [
+    "tests"
 ]

@@ -13,7 +13,7 @@ Currently, it integrates APIs from UK, Switzerland and Belgium, allowing you to 
 
 | Country               | API Base URL                                                     | Status |
 | --------------------- | ---------------------------------------------------------------- | ------ |
-| **United Kingdom**    | [https://transportapi.com](https://transportapi.com)             | ❌ (API key issues) |
+| **United Kingdom**    | [https://transportapi.com](https://transportapi.com)             | 🟡  (API key issues) |
 | **Switzerland**       | [https://transport.opendata.ch](https://transport.opendata.ch)   | ✅     |
 | **Belgium**           | [https://api.irail.be](https://api.irail.be)                      | ✅     |
 
@@ -101,9 +101,41 @@ Replace `/ABSOLUTE/PATH/TO/PARENT/FOLDER/mcp-server-public-transport` with the a
     uv run server.py
     ```
 
+### Running Tests
+
+The project uses pytest for testing with the following commands available:
+
+```bash
+# Run all tests
+make test
+```
+
+### Code Quality
+
+```bash
+# Run linting
+make lint
+
+# Run code formatting
+make format
+```
+
+### Continuous Integration
+
+The project includes a GitHub Actions workflow (`.github/workflows/test.yml`) that automatically:
+
+- Runs tests on Python 3.10, 3.11, and 3.12
+- Executes linting checks using ruff
+- Runs on every push and pull request to `main` branch
+
+The CI pipeline ensures code quality and compatibility across supported Python versions before any changes are merged.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+The package is deployed automatically to PyPI when project.version is updated in `pyproject.toml`.
+Follow semver for versioning.
 
 ## License
 
