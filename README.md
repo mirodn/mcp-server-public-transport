@@ -13,7 +13,7 @@ Currently, it integrates APIs from UK, Switzerland and Belgium, allowing you to 
 
 | Country               | API Base URL                                                     | Status |
 | --------------------- | ---------------------------------------------------------------- | ------ |
-| **United Kingdom**    | [https://transportapi.com](https://transportapi.com)             | 🟡  (API key issues) |
+| **United Kingdom**    | [https://transportapi.com](https://transportapi.com)             | ✅  |
 | **Switzerland**       | [https://transport.opendata.ch](https://transport.opendata.ch)   | ✅     |
 | **Belgium**           | [https://api.irail.be](https://api.irail.be)                      | ✅     |
 
@@ -22,7 +22,7 @@ Currently, it integrates APIs from UK, Switzerland and Belgium, allowing you to 
 | Feature               | API Path                                                        | Status |
 | --------------------- | --------------------------------------------------------------- | ------ |
 | **United Kingdom** |   |   |
-| Live Departures | `/uk/train/station/{station_code}/live.json`        | 🟡 (API key issues) |
+| Live Departures | `/uk/train/station_timetables/{station_code}.json`        | ✅ |
 | **Switzerland** | | |
 | Search Connections | `/connections`                    | ✅     |
 | Station Lookup     | `/locations`                      | ✅     |
