@@ -1,4 +1,5 @@
 # mcp-server-public-transport
+[![smithery badge](https://smithery.ai/badge/@mirodn/mcp-server-public-transport)](https://smithery.ai/server/@mirodn/mcp-server-public-transport)
 
 An MCP-compatible server providing real-time public transport data across Europe.
 
