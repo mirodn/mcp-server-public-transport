@@ -1,0 +1,29 @@
+# Smithery configuration file: https://smithery.ai/docs/build/project-config
+
+startCommand:
+  type: stdio
+  commandFunction:
+    # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
+    |-
+    (config) => ({ command: 'python', args: ['-u', 'server.py'], env: { UK_TRANSPORT_APP_ID: config.ukTransportAppId, UK_TRANSPORT_API_KEY: config.ukTransportApiKey, LOG_LEVEL: config.logLevel || 'INFO', MCP_TRANSPORT: 'stdio' } })
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    type: object
+    required:
+      - ukTransportAppId
+      - ukTransportApiKey
+    properties:
+      ukTransportAppId:
+        type: string
+        description: Your UK Transport API App ID
+      ukTransportApiKey:
+        type: string
+        description: Your UK Transport API Key
+      logLevel:
+        type: string
+        default: INFO
+        description: Logging level (e.g., INFO, DEBUG)
+  exampleConfig:
+    ukTransportAppId: exampleAppId
+    ukTransportApiKey: exampleApiKey
+    logLevel: INFO
