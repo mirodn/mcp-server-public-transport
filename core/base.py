@@ -79,7 +79,7 @@ async def fetch_json(
         logger.error(f"Client error for {url}: {e}")
         raise TransportAPIError(f"Network error: {e}")
     except Exception as e:
-        logger.error(f"Unexpected error for {url}: {e}")
+        logger.error(f"Unexpected error during fetch: {e}")
         raise TransportAPIError(f"Unexpected error: {e}")
 
 
