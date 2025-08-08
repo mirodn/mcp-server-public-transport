@@ -130,7 +130,7 @@ def register_ch_tools(mcp):
             params["distance"] = distance
 
         try:
-            logger.info(f"🇨🇭 Finding stations near: {latitude}, {longitude}")
+            logger.info("🇨🇭 Finding stations near provided coordinates")
             return await fetch_json(f"{CH_BASE_URL}/locations", params)
         except TransportAPIError as e:
             logger.error(f"CH nearby stations search failed: {e}")
