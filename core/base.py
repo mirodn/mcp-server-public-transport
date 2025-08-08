@@ -73,10 +73,10 @@ async def fetch_json(
                     raise TransportAPIError(f"Invalid JSON response: {e}")
 
     except asyncio.TimeoutError:
-        logger.error(f"Request timeout for {url}")
+        logger.error("Request timeout for API endpoint")
         raise TransportAPIError(f"Request timeout after {timeout} seconds")
     except aiohttp.ClientError as e:
-        logger.error(f"Client error for {url}: {e}")
+        logger.error(f"Client error during API request: {e}")
         raise TransportAPIError(f"Network error: {e}")
     except Exception as e:
         logger.error(f"Unexpected error during fetch: {e}")
