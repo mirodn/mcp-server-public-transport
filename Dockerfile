@@ -13,5 +13,5 @@ COPY . /app
 
 EXPOSE 8080
 
-CMD ["python", "server.py", "--transport", "http", "--host", "0.0.0.0", "--port", "8080", "--path", "/mcp/"]
+CMD ["python", "server.py", "--transport", "sse", "--host", "0.0.0.0", "--port", "8080", "--path", "/mcp"]
 
