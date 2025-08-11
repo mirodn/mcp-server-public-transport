@@ -9,13 +9,9 @@ from fastmcp import FastMCP
 from tools.ch import register_ch_tools
 from tools.uk import register_uk_tools
 from tools.be import register_be_tools
-from config import SERVER_NAME, LOG_LEVEL
+from config import SERVER_NAME
 
 # Configure logging
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
 logger = logging.getLogger(__name__)
 
 # Initialize MCP server
@@ -33,13 +29,23 @@ def main():
     )
     parser.add_argument("--host",     type=str, default="0.0.0.0", help="Host to bind for HTTP/SSE transports")
     parser.add_argument("--port",     type=int, default=8080,       help="Port for HTTP/SSE transport")
+    parser.add_argument("--path", type=str, default="/mcp", help="Path for HTTP/SSE transport (e.g. /mcp or /sse)")
+
+    # Optional logging level
     parser.add_argument(
-        "--path",
-        type=str,
-        default="/mcp",
-        help="Path for HTTP/SSE transport (e.g. /mcp or /sse)"
+        "--log-level",
+        default=os.getenv("LOG_LEVEL", "INFO"),
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Logging level"
     )
     args = parser.parse_args()
+
+    level_name = (args.log_level or os.getenv("LOG_LEVEL", "INFO")).upper()
+    logging.basicConfig(
+        level=getattr(logging, level_name, logging.INFO),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        force=True,
+    )
 
     # ——— Register tools ———————————————————————————————————————————
     ch_tools = register_ch_tools(mcp)
