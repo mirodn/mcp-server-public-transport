@@ -4,6 +4,10 @@
 
 An MCP-compatible server providing real-time public transport data across Europe.
 
+<a href="https://glama.ai/mcp/servers/@mirodn/mcp-server-public-transport">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@mirodn/mcp-server-public-transport/badge" />
+</a>
+
 ## About
 
 mcp-server-public-transport is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction)-compatible local server that provides access to public transport data across Europe.
