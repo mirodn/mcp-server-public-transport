@@ -56,7 +56,7 @@ async def fetch_json(
         async with aiohttp.ClientSession(
             timeout=timeout_obj, headers=default_headers
         ) as session:
-            logger.debug(f"Fetching: {url}")
+            logger.debug(f"Fetching: endpoint")
 
             async with session.get(url) as response:
                 if response.status != 200:
@@ -66,7 +66,7 @@ async def fetch_json(
 
                 try:
                     data = await response.json()
-                    logger.debug(f"Successfully fetched data from {url}")
+                    logger.debug(f"Successfully fetched data from API endpoint")
                     return data
                 except Exception as e:
                     logger.error(f"Failed to parse JSON response: {e}")
