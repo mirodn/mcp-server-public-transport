@@ -69,7 +69,7 @@ async def fetch_json(
                     logger.debug(f"Successfully fetched data from {url}")
                     return data
                 except Exception as e:
-                    logger.error(f"Failed to parse JSON from {url}: {e}")
+                    logger.error(f"Failed to parse JSON response: {e}")
                     raise TransportAPIError(f"Invalid JSON response: {e}")
 
     except asyncio.TimeoutError:
