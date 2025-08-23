@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-server-public-transport"
-version = "0.1.1"
-description = "An MCP-compatible server for querying public transport data in Europe (UK, CH, BE)."
+version = "0.1.2"
+description = "An MCP-compatible server for querying public transport data in Europe (UK, CH, BE, NO)."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }

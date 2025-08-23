@@ -11,7 +11,7 @@ An MCP-compatible server providing real-time public transport data across Europe
 ## About
 
 mcp-server-public-transport is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction)-compatible local server that provides access to public transport data across Europe.
-Currently, it integrates APIs from UK, Switzerland and Belgium, allowing you to retrieve train connections, live departures, and bus locations.
+Currently, it integrates APIs from UK, Switzerland, Norway and Belgium, allowing you to retrieve train connections, live departures, and bus locations.
 
 ## Feature Implementation Status
 
@@ -22,6 +22,7 @@ Currently, it integrates APIs from UK, Switzerland and Belgium, allowing you to 
 | **United Kingdom**    | [https://transportapi.com](https://transportapi.com)             | ✅  |
 | **Switzerland**       | [https://transport.opendata.ch](https://transport.opendata.ch)   | ✅     |
 | **Belgium**           | [https://api.irail.be](https://api.irail.be)                      | ✅     |
+| **Norway**            | [https://api.entur.io](https://api.entur.io)                     | ✅    |
 
 ### Features by Country
 
@@ -38,6 +39,11 @@ Currently, it integrates APIs from UK, Switzerland and Belgium, allowing you to 
 | Live Departures | `/departures`                   | ✅     |
 | Station Lookup     | `/stations`                     | ✅     |
 | Nearby Stations    | `/stations/nearby`              | ✅     |
+| **Norway**            |                                |        |
+| Place Search |`/geocoder/v1/autocomplete`| ✅ |
+| Live Departures| `GraphQL: stopPlace(id) { estimatedCalls(...) }`|✅|
+|Trip Planning| `GraphQL: trip(from, to, dateTime, numTripPatterns, ...)`	|✅|
+|Nearest Stops|`GraphQL: nearest(latitude, longitude, maximumDistance, ...)`|	✅|
 
 ## Setup
 

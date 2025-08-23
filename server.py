@@ -9,6 +9,7 @@ from fastmcp import FastMCP
 from tools.ch import register_ch_tools
 from tools.uk import register_uk_tools
 from tools.be import register_be_tools
+from tools.no import register_no_tools
 from config import SERVER_NAME
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ def main():
     # Register tools (UK only if keys exist and not disabled)
     ch_tools = register_ch_tools(mcp)
     be_tools = register_be_tools(mcp)
+    no_tools = register_no_tools(mcp)
 
     uk_app_id = os.getenv("UK_TRANSPORT_APP_ID")
     uk_api_key = os.getenv("UK_TRANSPORT_API_KEY")
@@ -62,7 +64,7 @@ def main():
 
     total = len(ch_tools) + len(uk_tools) + len(be_tools)
     logger.info(f"{SERVER_NAME} initialized with {total} tools "
-                f"(CH: {len(ch_tools)}, UK: {len(uk_tools)}, BE: {len(be_tools)})")
+                f"(CH: {len(ch_tools)}, NO: {len(no_tools)}, UK: {len(uk_tools)}, BE: {len(be_tools)})")
 
     # Start transport
     if args.transport == "stdio":
