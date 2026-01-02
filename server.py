@@ -27,7 +27,7 @@ def main():
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind for HTTP/SSE transports")
     parser.add_argument("--port", type=int, default=8080, help="Port for HTTP/SSE transport")
     # Optional: default to '/mcp/' to avoid 307 redirects
-    parser.add_argument("--path", type=str, default="/mcp/", help="Path for HTTP/SSE transport")
+    parser.add_argument("--path", type=str, default="/mcp", help="Path for HTTP/SSE transport")
     parser.add_argument(
         "--log-level",
         default=os.getenv("LOG_LEVEL", "INFO"),
