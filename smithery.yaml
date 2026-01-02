@@ -1,37 +1,30 @@
 # Smithery configuration file: https://smithery.ai/docs/build/project-config
 
-startCommand:
-  type: stdio
-  commandFunction: |-
-    (config) => ({
-      command: 'python',
-      args: ['-u', 'server.py', '--transport', 'stdio'],
-      env: {
-        MCP_TRANSPORT: 'stdio',
-        LOG_LEVEL: config.logLevel || 'INFO',
-        ...(config.ukTransportAppId ? { UK_TRANSPORT_APP_ID: config.ukTransportAppId } : {}),
-        ...(config.ukTransportApiKey ? { UK_TRANSPORT_API_KEY: config.ukTransportApiKey } : {}),
-      }
-    })
+runtime: "container"
 
+build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
+
+startCommand:
+  type: "http"
   configSchema:
     type: object
     properties:
-      ukTransportAppId:
-        type: string
-        description: Your UK Transport API App ID (optional)
-        default: ""
-      ukTransportApiKey:
-        type: string
-        description: Your UK Transport API Key (optional)
-        default: ""
       logLevel:
         type: string
-        default: INFO
-        enum: [DEBUG, INFO, WARNING, ERROR, CRITICAL]
-        description: Logging level
-
+        default: "INFO"
+        enum: ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+      ukTransportAppId:
+        type: string
+        default: ""
+        description: "Optional: UK Transport API App ID"
+      ukTransportApiKey:
+        type: string
+        default: ""
+        description: "Optional: UK Transport API Key"
   exampleConfig:
+    logLevel: "INFO"
     ukTransportAppId: ""
     ukTransportApiKey: ""
-    logLevel: INFO
+

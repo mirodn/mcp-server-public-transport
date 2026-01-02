@@ -2,16 +2,11 @@
 FROM python:3.11-slim
 
 WORKDIR /app
-
-# Install build tools and your package (reads pyproject.toml)
-COPY pyproject.toml setup.py* /app/
-RUN pip install --no-cache-dir wheel setuptools \
- && pip install --no-cache-dir .
-
-# Copy the rest of your code
 COPY . /app
+
+RUN pip install --no-cache-dir -U pip setuptools wheel \
+ && pip install --no-cache-dir .
 
 EXPOSE 8080
 
-CMD ["python", "server.py", "--transport", "sse", "--host", "0.0.0.0", "--port", "8080", "--path", "/mcp"]
-
+CMD ["python", "server.py", "--transport", "http", "--host", "0.0.0.0", "--port", "8080", "--path", "/mcp/"]
