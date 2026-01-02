@@ -2,7 +2,7 @@
 
 [![smithery badge](https://smithery.ai/badge/mirodn/mcp-server-public-transport)](https://smithery.ai/server/mirodn/mcp-server-public-transport)
 
-An MCP-compatible server providing real-time public transport data across Europe.
+An MCP Server providing real-time public transport data across Europe.
 
 <a href="https://glama.ai/mcp/servers/@mirodn/mcp-server-public-transport">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/@mirodn/mcp-server-public-transport/badge" />
