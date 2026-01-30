@@ -10,3 +10,4 @@ RUN pip install --no-cache-dir -U pip setuptools wheel \
 EXPOSE 8080
 
 CMD ["python", "server.py", "--transport", "http", "--host", "0.0.0.0", "--port", "8080", "--path", "/mcp"]
+
