@@ -1,0 +1,36 @@
+{
+  "serverInfo": {
+    "name": "MCP Public Transport Server",
+    "version": "2.14.4"
+  },
+  "authentication": {
+    "required": false
+  },
+  "tools": [
+    {
+      "name": "ch_search_connections",
+      "description": "Search for train connections in Switzerland between two stations.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string",
+            "description": "Departure station (e.g. Zürich HB)"
+          },
+          "destination": {
+            "type": "string",
+            "description": "Arrival station (e.g. Basel SBB)"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 4,
+            "description": "Maximum number of results"
+          }
+        },
+        "required": ["origin", "destination"]
+      }
+    }
+  ],
+  "resources": [],
+  "prompts": []
+}
