@@ -11,14 +11,16 @@ Provides:
 Notes:
 - Entur requires the `ET-Client-Name` header. We use the fixed value
   "miro-mcp-public-transport" for a plug-and-play developer experience.
-- Journey Planner: GraphQL v3 -> https://api.entur.io/journey-planner/v3/graphql
-- Geocoder: REST v1 -> https://api.entur.io/geocoder/v1/autocomplete
+  
+
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+from typing_extensions import Annotated
+from pydantic import Field
 
 import aiohttp
 
@@ -114,7 +116,6 @@ async def _post_graphql(
                 continue
             raise TransportAPIError(f"Entur GraphQL timeout after {tries} attempt(s): {e}") from e
 
-    # Should never reach here
     raise TransportAPIError("Entur GraphQL: exhausted retries without response")
 
 
@@ -126,24 +127,19 @@ def register_no_tools(mcp):
 
     @mcp.tool(
         name="no_search_places",
-        description="Autocomplete search across stops/addresses/POIs in Norway via Entur Geocoder."
+        description="Autocomplete search across stops/addresses/POIs in Norway via Entur Geocoder.",
     )
-    async def no_search_places(text: str, lang: str | None = "en", size: int | None = 10) -> dict[str, object]:
-        """
-        Args:
-            text: Free-text query (e.g., 'Oslo S', 'Bergen busstasjon').
-            lang: Language hint ('en', 'no', 'nb', 'nn', etc.). Default: 'en'.
-            size: Max number of results. Default: 10.
-        Returns:
-            Raw Entur Geocoder /autocomplete JSON.
-        """
+    async def no_search_places(
+        text: Annotated[str, Field(description="Free-text query. Example: 'Oslo S'", min_length=1)],
+        lang: Annotated[str | None, Field(description="Language hint ('en','no','nb','nn',...). Default 'en'.")] = "en",
+        size: Annotated[int | None, Field(description="Max results (default 10).", ge=1, le=50)] = 10,
+    ) -> dict[str, object]:
         if not text or not text.strip():
             raise ValueError("Parameter 'text' must not be empty.")
 
         params = {"text": text.strip(), "lang": (lang or "en"), "size": int(size or 10)}
         logger.info("🇳🇴 Entur geocoder autocomplete: %r", params)
 
-        # We'll do our own GET with retry/backoff, independent from any project helper.
         tries = 3
         for attempt in range(1, tries + 1):
             try:
@@ -176,16 +172,12 @@ def register_no_tools(mcp):
 
     @mcp.tool(
         name="no_stop_departures",
-        description="Upcoming departures for a StopPlace ID (e.g., 'NSR:StopPlace:58368')."
+        description="Upcoming departures for a StopPlace ID (e.g., 'NSR:StopPlace:58368').",
     )
-    async def no_stop_departures(stop_place_id: str, limit: int | None = 10) -> dict[str, object]:
-        """
-        Args:
-            stop_place_id: NSR StopPlace ID string.
-            limit: Number of departures to fetch. Default: 10.
-        Returns:
-            GraphQL `data` with stopPlace + estimatedCalls.
-        """
+    async def no_stop_departures(
+        stop_place_id: Annotated[str, Field(description="NSR StopPlace ID. Example: 'NSR:StopPlace:58368'", min_length=1)],
+        limit: Annotated[int | None, Field(description="Number of departures to fetch (default 10).", ge=1, le=50)] = 10,
+    ) -> dict[str, object]:
         if not stop_place_id or not stop_place_id.strip():
             raise ValueError("Parameter 'stop_place_id' must not be empty.")
 
@@ -214,18 +206,14 @@ def register_no_tools(mcp):
 
     @mcp.tool(
         name="no_trip",
-        description="Door-to-door trip planning between two StopPlaces (NSR IDs)."
+        description="Door-to-door trip planning between two StopPlaces (NSR IDs).",
     )
-    async def no_trip(from_id: str, to_id: str, date_time: str | None = None, results: int | None = 5) -> dict[str, object]:
-        """
-        Args:
-            from_id: NSR ID for origin (e.g., 'NSR:StopPlace:58368').
-            to_id: NSR ID for destination.
-            date_time: ISO 8601 datetime (e.g., '2025-08-23T12:00:00+02:00'). Optional.
-            results: Number of trip patterns. Default: 5.
-        Returns:
-            GraphQL `data` with trip -> tripPatterns -> legs.
-        """
+    async def no_trip(
+        from_id: Annotated[str, Field(description="Origin StopPlace NSR ID. Example: 'NSR:StopPlace:58368'", min_length=1)],
+        to_id: Annotated[str, Field(description="Destination StopPlace NSR ID.", min_length=1)],
+        date_time: Annotated[str | None, Field(description="ISO 8601 datetime (optional). Example: '2026-01-30T12:00:00+01:00'")] = None,
+        results: Annotated[int | None, Field(description="Number of trip patterns (default 5).", ge=1, le=10)] = 5,
+    ) -> dict[str, object]:
         if not from_id or not to_id:
             raise ValueError("'from_id' and 'to_id' are required.")
 
@@ -259,7 +247,7 @@ def register_no_tools(mcp):
             "from": from_id.strip(),
             "to": to_id.strip(),
             "results": int(results or 5),
-            "dateTime": date_time,  # may be None
+            "dateTime": date_time,
         }
         logger.info(
             "🇳🇴 Entur trip: %s -> %s (results=%s, dateTime=%s)",
@@ -269,18 +257,14 @@ def register_no_tools(mcp):
 
     @mcp.tool(
         name="no_nearest_stops",
-        description="Find nearest StopPlaces for a coordinate (lat, lon) within a radius in meters."
+        description="Find nearest StopPlaces for a coordinate (lat, lon) within a radius in meters.",
     )
-    async def no_nearest_stops(lat: float, lon: float, radius: int | None = 500, limit: int | None = 10) -> dict[str, object]:
-        """
-        Args:
-            lat: Latitude.
-            lon: Longitude.
-            radius: Max distance in meters. Default: 500.
-            limit: Max number of places to return. Default: 10.
-        Returns:
-            GraphQL `data` with nearest StopPlaces (distance + names + IDs).
-        """
+    async def no_nearest_stops(
+        lat: Annotated[float, Field(description="Latitude.", ge=-90, le=90)],
+        lon: Annotated[float, Field(description="Longitude.", ge=-180, le=180)],
+        radius: Annotated[int | None, Field(description="Max distance in meters (default 500).", ge=50, le=50000)] = 500,
+        limit: Annotated[int | None, Field(description="Max number of stops to return (default 10).", ge=1, le=50)] = 10,
+    ) -> dict[str, object]:
         query = """
         query Nearest($lat: Float!, $lon: Float!, $radius: Int!, $first: Int!) {
           nearest(
@@ -313,4 +297,5 @@ def register_no_tools(mcp):
         )
         return await _post_graphql(query, variables)
 
-    return ["no_search_places", "no_stop_departures", "no_trip", "no_nearest_stops"]
+    # IMPORTANT: return functions (consistent with other modules)
+    return [no_search_places, no_stop_departures, no_trip, no_nearest_stops]

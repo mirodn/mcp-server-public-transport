@@ -1,48 +1,64 @@
+# tools/ch.py
 """
 Swiss public transport tools for MCP server
 Uses transport.opendata.ch API
 """
 
-from typing import Dict, Any, Optional
 import logging
+from typing import Any, Dict, Optional
+from typing_extensions import Annotated
+from pydantic import Field
+
 from core.base import fetch_json, validate_station_name, TransportAPIError, format_time_for_api
 from config import CH_BASE_URL
 
 logger = logging.getLogger(__name__)
+
 
 def register_ch_tools(mcp):
     """Register Swiss transport tools with the MCP server"""
 
     @mcp.tool(
         name="ch_search_connections",
-        description="Search for train connections in Switzerland between two stations. Uses transport.opendata.ch API to provide real-time connection data including departure times, duration, platforms, and transfers."
+        description=(
+            "Search for train connections in Switzerland between two stations. "
+            "Uses transport.opendata.ch API to provide real-time connection data including "
+            "departure times, duration, platforms, and transfers."
+        ),
     )
     async def ch_search_connections(
-        origin: str,
-        destination: str,
-        limit: Optional[int] = 4,
-        date: Optional[str] = None,
-        time: Optional[str] = None,
-        is_arrival_time: Optional[bool] = False
+        origin: Annotated[
+            str,
+            Field(description="Departure station name (CH). Example: 'Zürich HB'", min_length=1),
+        ],
+        destination: Annotated[
+            str,
+            Field(description="Arrival station name (CH). Example: 'Basel SBB'", min_length=1),
+        ],
+        limit: Annotated[
+            Optional[int],
+            Field(description="Max number of connections (default 4).", ge=1, le=10),
+        ] = 4,
+        date: Annotated[
+            Optional[str],
+            Field(description="Date in YYYY-MM-DD format (optional)."),
+        ] = None,
+        time: Annotated[
+            Optional[str],
+            Field(description="Time in HH:MM format (optional)."),
+        ] = None,
+        is_arrival_time: Annotated[
+            Optional[bool],
+            Field(description="If true, interpret 'time' as arrival time (default false)."),
+        ] = False,
     ) -> Dict[str, Any]:
-        """
-        Search for train connections between Swiss stations.
-
-        Args:
-            origin: Departure station name (e.g., 'Zürich HB')
-            destination: Arrival station name (e.g., 'Basel SBB')
-            limit: Max number of connections (default: 4)
-            date: Date in format YYYY-MM-DD
-            time: Time in HH:MM format
-            is_arrival_time: Whether time refers to arrival (True) or departure (False)
-        """
         origin_clean = validate_station_name(origin)
         destination_clean = validate_station_name(destination)
 
-        params = {
+        params: Dict[str, Any] = {
             "from": origin_clean,
             "to": destination_clean,
-            "limit": limit or 4
+            "limit": int(limit or 4),
         }
 
         if date:
@@ -53,92 +69,114 @@ def register_ch_tools(mcp):
             params["isArrivalTime"] = "1"
 
         try:
-            logger.info(f"Searching connections: {origin} → {destination}")
+            logger.info("Searching connections: %s → %s", origin_clean, destination_clean)
             return await fetch_json(f"{CH_BASE_URL}/connections", params)
         except TransportAPIError as e:
-            logger.error(f"CH connection search failed: {e}")
+            logger.error("CH connection search failed: %s", e)
             raise
 
     @mcp.tool(
         name="ch_search_stations",
-        description="Search for Swiss train stations by name or location."
+        description="Search for Swiss train stations by name or location.",
     )
     async def ch_search_stations(
-        query: str,
-        type: Optional[str] = "station"
+        query: Annotated[
+            str,
+            Field(description="Station/location search query. Example: 'Bern'", min_length=1),
+        ],
+        type: Annotated[
+            Optional[str],
+            Field(description="Location type filter (default 'station'). Example: 'station'"),
+        ] = "station",
     ) -> Dict[str, Any]:
-        """Search for Swiss stations by name."""
-        if not query or not query.strip():
+        query_clean = query.strip() if query else ""
+        if not query_clean:
             raise ValueError("Search query cannot be empty")
 
         params = {
-            "query": query.strip(),
-            "type": type or "station"
+            "query": query_clean,
+            "type": type or "station",
         }
 
         try:
-            logger.info(f"Searching stations: {query}")
+            logger.info("Searching stations: %s", query_clean)
             return await fetch_json(f"{CH_BASE_URL}/locations", params)
         except TransportAPIError as e:
-            logger.error(f"CH station search failed: {e}")
+            logger.error("CH station search failed: %s", e)
             raise
 
     @mcp.tool(
         name="ch_get_departures",
-        description="Get departure board for a Swiss train station with real-time information."
+        description="Get departure board for a Swiss train station with real-time information.",
     )
     async def ch_get_departures(
-        station: str,
-        limit: Optional[int] = 10,
-        datetime: Optional[str] = None
+        station: Annotated[
+            str,
+            Field(description="Station name (CH). Example: 'Luzern'", min_length=1),
+        ],
+        limit: Annotated[
+            Optional[int],
+            Field(description="Max departures to return (default 10).", ge=1, le=50),
+        ] = 10,
+        datetime: Annotated[
+            Optional[str],
+            Field(description="Datetime ISO string supported by API (optional)."),
+        ] = None,
     ) -> Dict[str, Any]:
-        """Get departures from a Swiss train station."""
         station_clean = validate_station_name(station)
 
-        params = {
+        params: Dict[str, Any] = {
             "station": station_clean,
-            "limit": limit or 10
+            "limit": int(limit or 10),
         }
 
         if datetime:
             params["datetime"] = datetime
 
         try:
-            logger.info(f"Getting departures for: {station}")
+            logger.info("Getting departures for: %s", station_clean)
             return await fetch_json(f"{CH_BASE_URL}/stationboard", params)
         except TransportAPIError as e:
-            logger.error(f"CH departures fetch failed: {e}")
+            logger.error("CH departures fetch failed: %s", e)
             raise
 
     @mcp.tool(
         name="ch_nearby_stations",
-        description="Find nearby Swiss train stations based on coordinates (latitude, longitude)."
+        description="Find nearby Swiss train stations based on coordinates (latitude, longitude).",
     )
     async def ch_nearby_stations(
-        latitude: float,
-        longitude: float,
-        distance: Optional[int] = 1000
+        latitude: Annotated[
+            float,
+            Field(description="Latitude in decimal degrees. Example: 47.378", ge=-90, le=90),
+        ],
+        longitude: Annotated[
+            float,
+            Field(description="Longitude in decimal degrees. Example: 8.540", ge=-180, le=180),
+        ],
+        distance: Annotated[
+            Optional[int],
+            Field(description="Search radius in meters (default 1000).", ge=50, le=50000),
+        ] = 1000,
     ) -> Dict[str, Any]:
-        """Find nearby stations by coordinates."""
-        params = {
-            "x": longitude,
-            "y": latitude,
-            "type": "station"
+        params: Dict[str, Any] = {
+            "x": float(longitude),
+            "y": float(latitude),
+            "type": "station",
         }
 
-        if distance:
-            params["distance"] = distance
+        if distance is not None:
+            params["distance"] = int(distance)
 
         try:
-            logger.info(f"Finding stations near provided coordinates")
+            logger.info("Finding stations near coordinates")
             return await fetch_json(f"{CH_BASE_URL}/locations", params)
         except TransportAPIError as e:
-            logger.error(f"CH nearby stations search failed: {e}")
+            logger.error("CH nearby stations search failed: %s", e)
             raise
 
     return [
         ch_search_connections,
         ch_search_stations,
         ch_get_departures,
-        ch_nearby_stations
+        ch_nearby_stations,
     ]
