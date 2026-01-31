@@ -27,7 +27,6 @@ dependencies = [
     "python-dotenv>=1.1.1",
     "typing-extensions>=4.8",
     "pydantic>=2.6",
-    "uvicorn[standard]",
     "requests>=2.32.4",
 ]
 
