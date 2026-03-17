@@ -64,7 +64,7 @@ def main():
         else:
             logger.info("UK tools disabled via --disable-uk")
 
-    total = len(ch_tools) + len(uk_tools) + len(be_tools) + len(it_tools) + len(no_tools)
+    total = len(ch_tools) + len(uk_tools) + len(be_tools) + len(it_tools)
     logger.info(f"{SERVER_NAME} initialized with {total} tools "
                 f"(CH: {len(ch_tools)}, NO: {len(no_tools)}, UK: {len(uk_tools)}, BE: {len(be_tools)}, IT: {len(it_tools)})")
 

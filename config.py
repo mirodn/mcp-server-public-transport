@@ -18,8 +18,8 @@ UK_APP_ID = os.getenv("UK_TRANSPORT_APP_ID")
 # Belgium iRail API (docs.irail.be)
 BE_BASE_URL = "https://api.irail.be"
 
-# Italy Rome Mobilità GTFS Realtime (protobuf feed)
-IT_BASE_URL = "https://romamobilita.it/sites/default/files/rome_rtgtfs_vehicle_positions_feed.pb"
+# Italy Roma Mobilità GTFS Realtime API
+IT_BASE_URL = "https://romamobilita.it/wp-content/uploads/drupal/rome_rtgtfs_vehicle_positions_feed.pb"
 
 # Server settings
 SERVER_NAME = "MCP Public Transport Server"

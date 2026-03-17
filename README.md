@@ -11,7 +11,7 @@ An MCP Server providing real-time public transport data across Europe.
 ## About
 
 mcp-server-public-transport is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction)-compatible local server that provides access to public transport data across Europe.
-Currently, it integrates APIs from UK, Switzerland, Norway and Belgium, allowing you to retrieve train connections, live departures, and bus locations.
+Currently, it integrates APIs from UK, Switzerland, Norway, Belgium and Italy, allowing you to retrieve train connections, live departures, and bus locations.
 
 ## Feature Implementation Status
 
@@ -23,6 +23,7 @@ Currently, it integrates APIs from UK, Switzerland, Norway and Belgium, allowing
 | **Switzerland**       | [https://transport.opendata.ch](https://transport.opendata.ch)   | ✅     |
 | **Belgium**           | [https://api.irail.be](https://api.irail.be)                      | ✅     |
 | **Norway**            | [https://api.entur.io](https://api.entur.io)                     | ✅    |
+| **Italy**             | [https://romamobilita.it](https://romamobilita.it)               | ✅     |
 
 ### Features by Country
 
@@ -44,6 +45,11 @@ Currently, it integrates APIs from UK, Switzerland, Norway and Belgium, allowing
 | Live Departures| `GraphQL: stopPlace(id) { estimatedCalls(...) }`|✅|
 |Trip Planning| `GraphQL: trip(from, to, dateTime, numTripPatterns, ...)`	|✅|
 |Nearest Stops|`GraphQL: nearest(latitude, longitude, maximumDistance, ...)`|	✅|
+| **Italy**           |                                |        |
+| Vehicle Positions | `GTFS Realtime protobuf feed` | ✅ |
+| Bus Positions | `it_get_bus_positions` | ✅ |
+| Tram Positions | `it_get_tram_positions` | ✅ |
+| Metro Positions | `it_get_metro_positions` | ✅ |
 
 ## Setup
 
@@ -55,6 +61,8 @@ Set the following environment variables:
 UK_TRANSPORT_APP_ID=your_uk_app_id
 UK_TRANSPORT_API_KEY=your_uk_api_key
 ```
+
+> Note: Italy (Roma Mobilità) does not require API keys - the GTFS Realtime feed is publicly available.
 
 ### Usage with Claude Desktop
 
