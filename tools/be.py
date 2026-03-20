@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 from typing_extensions import Annotated
 from pydantic import Field
 
-from core.base import fetch_json, TransportAPIError
+from core.base import fetch_json, TransportAPIError, validate_station_name
 from config import BE_BASE_URL
 
 logger = logging.getLogger(__name__)
@@ -56,11 +56,9 @@ def register_be_tools(mcp):
             Field(description="Travel time in HH:MM format (optional)."),
         ] = None,
     ) -> Dict[str, Any]:
-        origin_clean = origin.strip() if origin else ""
-        destination_clean = destination.strip() if destination else ""
+        origin_clean = validate_station_name(origin)
+        destination_clean = validate_station_name(destination)
 
-        if not origin_clean or not destination_clean:
-            raise ValueError("Origin and destination must be provided and non-empty")
         if origin_clean == destination_clean:
             raise ValueError("Origin and destination must be different")
 
@@ -93,8 +91,8 @@ def register_be_tools(mcp):
         ]
     ) -> Dict[str, Any]:
         query_clean = query.strip() if query else ""
-        if not query_clean:
-            raise ValueError("Station search query cannot be empty")
+        if not query_clean or len(query_clean) < 2:
+            raise ValueError("Station search query must be at least 2 characters")
 
         params = {"input": query_clean, "format": "json"}
 
@@ -119,9 +117,7 @@ def register_be_tools(mcp):
             Field(description="Max departures to return (default 10).", ge=1, le=50),
         ] = 10,
     ) -> Dict[str, Any]:
-        station_clean = station.strip() if station else ""
-        if not station_clean:
-            raise ValueError("Station name must be provided for departures lookup")
+        station_clean = validate_station_name(station)
 
         params = {
             "station": station_clean,

@@ -11,7 +11,7 @@ Provides:
 Notes:
 - Entur requires the `ET-Client-Name` header. We use the fixed value
   "miro-mcp-public-transport" for a plug-and-play developer experience.
-  
+
 
 """
 
@@ -23,29 +23,7 @@ from typing_extensions import Annotated
 from pydantic import Field
 
 import aiohttp
-
-# -----------------------------------------------------------------------------
-# Optional reuse of project helpers (if available), otherwise safe fallbacks
-# -----------------------------------------------------------------------------
-try:
-    from core.base import TransportAPIError, fetch_json  # type: ignore
-except Exception:  # Fallbacks if your project doesn't expose these
-    class TransportAPIError(RuntimeError):
-        """Generic transport API error."""
-
-    async def fetch_json(
-        url: str,
-        *,
-        params: dict[str, str] | None = None,
-        headers: dict[str, str] | None = None,
-        timeout: int = 30,
-    ) -> dict[str, object]:
-        async with aiohttp.ClientSession(headers=headers, timeout=aiohttp.ClientTimeout(total=timeout)) as session:
-            async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
-                if resp.status >= 400:
-                    text = await resp.text()
-                    raise TransportAPIError(f"HTTP {resp.status} for {url}: {text}")
-                return await resp.json()
+from core.base import TransportAPIError, get_session
 
 logger = logging.getLogger(__name__)
 
@@ -92,24 +70,29 @@ async def _post_graphql(
 
     for attempt in range(1, tries + 1):
         try:
-            async with aiohttp.ClientSession(headers=COMMON_HEADERS, timeout=_make_timeout(timeout)) as session:
-                async with session.post(NO_JP_BASE_URL, json=payload, timeout=_make_timeout(timeout)) as resp:
-                    # Retry on rate limit or server errors
-                    if resp.status == 429 or resp.status >= 500:
-                        text = await resp.text()
-                        if attempt < tries:
-                            await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
-                            continue
-                        raise TransportAPIError(f"Entur GraphQL HTTP {resp.status}: {text}")
+            session = await get_session()
+            async with session.post(
+                NO_JP_BASE_URL,
+                json=payload,
+                headers=COMMON_HEADERS,
+                timeout=_make_timeout(timeout),
+            ) as resp:
+                # Retry on rate limit or server errors
+                if resp.status == 429 or resp.status >= 500:
+                    text = await resp.text()
+                    if attempt < tries:
+                        await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
+                        continue
+                    raise TransportAPIError(f"Entur GraphQL HTTP {resp.status}: {text}")
 
-                    if resp.status >= 400:
-                        text = await resp.text()
-                        raise TransportAPIError(f"Entur GraphQL HTTP {resp.status}: {text}")
+                if resp.status >= 400:
+                    text = await resp.text()
+                    raise TransportAPIError(f"Entur GraphQL HTTP {resp.status}: {text}")
 
-                    data = await resp.json()
-                    if "errors" in data and data["errors"]:
-                        raise TransportAPIError(f"Entur GraphQL errors: {data['errors']}")
-                    return data.get("data", {})
+                data = await resp.json()
+                if "errors" in data and data["errors"]:
+                    raise TransportAPIError(f"Entur GraphQL errors: {data['errors']}")
+                return data.get("data", {})
         except (asyncio.TimeoutError, aiohttp.ServerTimeoutError) as e:
             if attempt < tries:
                 await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
@@ -143,25 +126,25 @@ def register_no_tools(mcp):
         tries = 3
         for attempt in range(1, tries + 1):
             try:
-                async with aiohttp.ClientSession(timeout=_make_timeout()) as session:
-                    async with session.get(
-                        NO_GEOCODER_AUTOCOMPLETE_URL,
-                        params=params,
-                        headers={"ET-Client-Name": NO_CLIENT_NAME, "Accept": "application/json"},
-                        timeout=_make_timeout(),
-                    ) as resp:
-                        if resp.status == 429 or resp.status >= 500:
-                            if attempt < tries:
-                                await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
-                                continue
-                            text_body = await resp.text()
-                            raise TransportAPIError(f"Entur Geocoder HTTP {resp.status}: {text_body}")
+                session = await get_session()
+                async with session.get(
+                    NO_GEOCODER_AUTOCOMPLETE_URL,
+                    params=params,
+                    headers={"ET-Client-Name": NO_CLIENT_NAME, "Accept": "application/json"},
+                    timeout=_make_timeout(),
+                ) as resp:
+                    if resp.status == 429 or resp.status >= 500:
+                        if attempt < tries:
+                            await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
+                            continue
+                        text_body = await resp.text()
+                        raise TransportAPIError(f"Entur Geocoder HTTP {resp.status}: {text_body}")
 
-                        if resp.status >= 400:
-                            text_body = await resp.text()
-                            raise TransportAPIError(f"Entur Geocoder HTTP {resp.status}: {text_body}")
+                    if resp.status >= 400:
+                        text_body = await resp.text()
+                        raise TransportAPIError(f"Entur Geocoder HTTP {resp.status}: {text_body}")
 
-                        return await resp.json()
+                    return await resp.json()
             except (asyncio.TimeoutError, aiohttp.ServerTimeoutError) as e:
                 if attempt < tries:
                     await asyncio.sleep(0.5 * (2 ** (attempt - 1)))

@@ -27,16 +27,18 @@ async def get_session() -> aiohttp.ClientSession:
     """
     Get or create a shared aiohttp ClientSession.
     Uses connection pooling for better performance and resource management.
+    Thread-safe via async lock.
     """
     global _session
-    if _session is None or _session.closed:
-        _session = aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=30),
-            headers={
-                "User-Agent": "MCP-Public-Transport-Server/1.0",
-            },
-        )
-    return _session
+    async with _session_lock:
+        if _session is None or _session.closed:
+            _session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=30),
+                headers={
+                    "User-Agent": "MCP-Public-Transport-Server/1.0",
+                },
+            )
+        return _session
 
 
 async def close_session() -> None:
