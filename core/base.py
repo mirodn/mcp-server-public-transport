@@ -5,6 +5,7 @@ Base utilities for MCP public transport server
 import aiohttp
 import asyncio
 import logging
+import atexit
 from typing import Dict, Any, Optional
 from urllib.parse import urlencode
 
@@ -15,6 +16,52 @@ class TransportAPIError(Exception):
     """Custom exception for transport API errors"""
 
     pass
+
+
+# Shared session for connection pooling and reuse
+_session: Optional[aiohttp.ClientSession] = None
+_session_lock = asyncio.Lock()
+
+
+async def get_session() -> aiohttp.ClientSession:
+    """
+    Get or create a shared aiohttp ClientSession.
+    Uses connection pooling for better performance and resource management.
+    """
+    global _session
+    if _session is None or _session.closed:
+        _session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=30),
+            headers={
+                "User-Agent": "MCP-Public-Transport-Server/1.0",
+            },
+        )
+    return _session
+
+
+async def close_session() -> None:
+    """Close the shared session. Call during shutdown."""
+    global _session
+    if _session and not _session.closed:
+        await _session.close()
+        _session = None
+        logger.debug("Closed shared aiohttp session")
+
+
+def _sync_close_session() -> None:
+    """Synchronous wrapper for atexit. Best-effort cleanup."""
+    global _session
+    if _session and not _session.closed:
+        # Create a new event loop for cleanup if needed
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(close_session())
+        except RuntimeError:
+            # No running loop, create a new one
+            asyncio.run(close_session())
+
+
+atexit.register(_sync_close_session)
 
 
 async def fetch_json(
@@ -42,38 +89,34 @@ async def fetch_json(
         query_string = urlencode(params)
         url = f"{url}?{query_string}"
 
-    default_headers = {
-        "User-Agent": "MCP-Public-Transport-Server/1.0",
-        "Accept": "application/json",
-    }
-
+    request_headers = {"Accept": "application/json"}
     if headers:
-        default_headers.update(headers)
+        request_headers.update(headers)
 
     try:
-        timeout_obj = aiohttp.ClientTimeout(total=timeout)
+        session = await get_session()
 
-        async with aiohttp.ClientSession(
-            timeout=timeout_obj, headers=default_headers
-        ) as session:
-            logger.debug(f"Fetching: endpoint")
+        # Override timeout for this specific request if different from default
+        client_timeout = aiohttp.ClientTimeout(total=timeout)
 
-            async with session.get(url) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    logger.error(f"HTTP {response.status}: {error_text}")
-                    raise TransportAPIError(f"HTTP {response.status}: {error_text}")
+        logger.debug(f"Fetching: {url}")
 
-                try:
-                    data = await response.json()
-                    logger.debug(f"Successfully fetched data from API endpoint")
-                    return data
-                except Exception as e:
-                    logger.error(f"Failed to parse JSON response: {e}")
-                    raise TransportAPIError(f"Invalid JSON response: {e}")
+        async with session.get(url, headers=request_headers, timeout=client_timeout) as response:
+            if response.status != 200:
+                error_text = await response.text()
+                logger.error(f"HTTP {response.status}: {error_text}")
+                raise TransportAPIError(f"HTTP {response.status}: {error_text}")
+
+            try:
+                data = await response.json()
+                logger.debug(f"Successfully fetched data from API endpoint")
+                return data
+            except Exception as e:
+                logger.error(f"Failed to parse JSON response: {e}")
+                raise TransportAPIError(f"Invalid JSON response: {e}")
 
     except asyncio.TimeoutError:
-        logger.error("Request timeout for API endpoint")
+        logger.error(f"Request timeout for {url}")
         raise TransportAPIError(f"Request timeout after {timeout} seconds")
     except aiohttp.ClientError as e:
         logger.error(f"Client error during API request: {e}")
