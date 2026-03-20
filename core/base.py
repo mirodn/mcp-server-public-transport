@@ -101,7 +101,7 @@ async def fetch_json(
         # Override timeout for this specific request if different from default
         client_timeout = aiohttp.ClientTimeout(total=timeout)
 
-        logger.debug(f"Fetching: {url}")
+        logger.debug("Fetching data from API endpoint")
 
         async with session.get(url, headers=request_headers, timeout=client_timeout) as response:
             if response.status != 200:
