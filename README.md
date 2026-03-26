@@ -11,7 +11,7 @@ An MCP Server providing real-time public transport data across Europe.
 ## About
 
 mcp-server-public-transport is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction)-compatible local server that provides access to public transport data across Europe.
-Currently, it integrates APIs from UK, Switzerland, Norway and Belgium, allowing you to retrieve train connections, live departures, and bus locations.
+Currently, it integrates APIs from UK, Switzerland, Norway, Belgium and Berlin/Brandenburg, allowing you to retrieve train connections, live departures, and bus locations.
 
 ## Feature Implementation Status
 
@@ -23,6 +23,7 @@ Currently, it integrates APIs from UK, Switzerland, Norway and Belgium, allowing
 | **Switzerland**       | [https://transport.opendata.ch](https://transport.opendata.ch)   | ✅     |
 | **Belgium**           | [https://api.irail.be](https://api.irail.be)                      | ✅     |
 | **Norway**            | [https://api.entur.io](https://api.entur.io)                     | ✅    |
+| **Berlin/Brandenburg**| [https://v6.vbb.transport.rest](https://v6.vbb.transport.rest)   | ✅    |
 
 ### Features by Country
 
@@ -44,6 +45,12 @@ Currently, it integrates APIs from UK, Switzerland, Norway and Belgium, allowing
 | Live Departures| `GraphQL: stopPlace(id) { estimatedCalls(...) }`|✅|
 |Trip Planning| `GraphQL: trip(from, to, dateTime, numTripPatterns, ...)`	|✅|
 |Nearest Stops|`GraphQL: nearest(latitude, longitude, maximumDistance, ...)`|	✅|
+| **Berlin/Brandenburg** | | |
+| Location Search | `/locations` | ✅ |
+| Live Departures | `/stops/:id/departures` | ✅ |
+| Live Arrivals | `/stops/:id/arrivals` | ✅ |
+| Journey Planning | `/journeys` | ✅ |
+| Nearby Stations | `/locations/nearby` | ✅ |
 
 ## Setup
 

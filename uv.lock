@@ -903,7 +903,7 @@ wheels = [
 
 [[package]]
 name = "mcp-server-public-transport"
-version = "0.1.2"
+version = "0.1.3"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -922,6 +922,12 @@ dev = [
     { name = "ruff" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.12.14" },
@@ -936,6 +942,12 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.8" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.4.1" },
+    { name = "pytest-asyncio", specifier = ">=1.1.0" },
+]
 
 [[package]]
 name = "mdurl"

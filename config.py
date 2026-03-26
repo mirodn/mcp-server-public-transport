@@ -18,6 +18,9 @@ UK_BASE_URL = "https://transportapi.com/v3/uk"
 # Belgium iRail API (docs.irail.be)
 BE_BASE_URL = "https://api.irail.be"
 
+# Berlin/Brandenburg VBB API (v6.vbb.transport.rest)
+VBB_BASE_URL = "https://v6.vbb.transport.rest"
+
 # Server settings
 SERVER_NAME = "MCP Public Transport Server"
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

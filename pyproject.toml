@@ -46,3 +46,9 @@ addopts = "--maxfail=1 --disable-warnings -q"
 testpaths = [
     "tests"
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+]
