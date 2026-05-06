@@ -273,7 +273,7 @@ def register_vbb_tools(mcp):
             params["distance"] = int(distance)
 
         try:
-            logger.info("Finding VBB stations near: lat=%s, lon=%s", latitude, longitude)
+            logger.info("Finding VBB stations near requested coordinates")
             return await fetch_json(f"{VBB_BASE_URL}/locations/nearby", params)
         except TransportAPIError as e:
             logger.error("VBB nearby stations search failed: %s", e)
