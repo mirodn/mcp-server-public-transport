@@ -4,7 +4,9 @@ from tools.be import register_be_tools
 
 @pytest.fixture
 def mcp():
-    return FastMCP("test-be")
+    server = FastMCP("test-be")
+    register_be_tools(server)
+    return server
 
 @pytest.fixture(autouse=True)
 def mock_fetch_json(monkeypatch):
@@ -13,28 +15,32 @@ def mock_fetch_json(monkeypatch):
     monkeypatch.setattr("tools.be.fetch_json", dummy)
     return dummy
 
+async def get_tool(mcp, name):
+    tools = await mcp._list_tools()
+    return next(t for t in tools if t.name == name)
+
 class TestBETools:
 
     @pytest.mark.unit
     async def test_be_search_connections(self, mcp):
-        fn = next(t for t in register_be_tools(mcp) if t.name == "be_search_connections")
+        fn = await get_tool(mcp, "be_search_connections")
         result = await fn.fn("Brussels", "Antwerp")
         assert result == {"dummy": True}
 
     @pytest.mark.unit
     async def test_be_search_stations(self, mcp):
-        fn = next(t for t in register_be_tools(mcp) if t.name == "be_search_stations")
+        fn = await get_tool(mcp, "be_search_stations")
         result = await fn.fn("Brussels")
         assert result == {"dummy": True}
 
     @pytest.mark.unit
     async def test_be_get_departures(self, mcp):
-        fn = next(t for t in register_be_tools(mcp) if t.name == "be_get_departures")
+        fn = await get_tool(mcp, "be_get_departures")
         result = await fn.fn("Brussels", limit=7)
         assert result == {"dummy": True}
 
     @pytest.mark.unit
     async def test_be_get_vehicle(self, mcp):
-        fn = next(t for t in register_be_tools(mcp) if t.name == "be_get_vehicle")
+        fn = await get_tool(mcp, "be_get_vehicle")
         result = await fn.fn("IC531")
         assert result == {"dummy": True}
