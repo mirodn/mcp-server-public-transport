@@ -11,7 +11,7 @@ An MCP Server providing real-time public transport data across Europe.
 ## About
 
 mcp-server-public-transport is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction)-compatible local server that provides access to public transport data across Europe.
-Currently, it integrates APIs from UK, Switzerland, Norway, Belgium and Berlin/Brandenburg, allowing you to retrieve train connections, live departures, and bus locations.
+Currently, it integrates APIs from UK, Switzerland, Norway, Belgium, Berlin/Brandenburg and Portugal (Lisbon + Porto), allowing you to retrieve train connections, live departures, and bus locations.
 
 ## Feature Implementation Status
 
@@ -24,6 +24,7 @@ Currently, it integrates APIs from UK, Switzerland, Norway, Belgium and Berlin/B
 | **Belgium**           | [https://api.irail.be](https://api.irail.be)                      | ✅     |
 | **Norway**            | [https://api.entur.io](https://api.entur.io)                     | ✅    |
 | **Berlin/Brandenburg**| [https://v6.vbb.transport.rest](https://v6.vbb.transport.rest)   | ✅    |
+| **Portugal** (Lisbon + Porto) | [https://api.transitous.org](https://api.transitous.org)      | ✅    |
 
 ### Features by Country
 
@@ -51,6 +52,13 @@ Currently, it integrates APIs from UK, Switzerland, Norway, Belgium and Berlin/B
 | Live Arrivals | `/stops/:id/arrivals` | ✅ |
 | Journey Planning | `/journeys` | ✅ |
 | Nearby Stations | `/locations/nearby` | ✅ |
+| **Portugal** (Lisbon + Porto) | | |
+| Station Lookup | `/geocode` | ✅ |
+| Search Connections | `/plan` | ✅ |
+| Departure Board | `/stoptimes` | ✅ |
+| Nearby Stations | `/reverse-geocode` | ✅ |
+
+> Portugal coverage is scoped to the Lisbon and Porto metro areas (Metro Lisboa, Carris, Carris Metropolitana, CP suburban; Metro do Porto, STCP) via [Transitous](https://transitous.org), a free MOTIS instance over ingested GTFS feeds. No API key required.
 
 ## Setup
 
