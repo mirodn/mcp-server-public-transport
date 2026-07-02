@@ -35,7 +35,12 @@ async def get_session() -> aiohttp.ClientSession:
             _session = aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(total=30),
                 headers={
-                    "User-Agent": "MCP-Public-Transport-Server/1.0",
+                    # Identify the client with contact info. Some upstreams (e.g.
+                    # Transitous) require an identifying User-Agent in their usage policy.
+                    "User-Agent": (
+                        "MCP-Public-Transport-Server/1.0 "
+                        "(+https://github.com/mirodn/mcp-server-public-transport)"
+                    ),
                 },
             )
         return _session
