@@ -21,6 +21,10 @@ BE_BASE_URL = "https://api.irail.be"
 # Berlin/Brandenburg VBB API (v6.vbb.transport.rest)
 VBB_BASE_URL = "https://v6.vbb.transport.rest"
 
+# Portugal via Transitous (MOTIS routing over ingested GTFS feeds)
+# scoped to Lisbon + Porto metro areas, no auth
+PT_BASE_URL = "https://api.transitous.org/api/v1"
+
 # Server settings
 SERVER_NAME = "MCP Public Transport Server"
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
