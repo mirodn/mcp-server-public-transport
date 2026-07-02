@@ -14,6 +14,11 @@ Provides:
 - pt_nearby_stations: find stops near coordinates
 
 No authentication required.
+
+Attribution: data is provided by Transitous (https://transitous.org), a best-effort,
+volunteer-run service built on openly ingested GTFS feeds. Keep the attribution visible
+to users and follow the usage policy at https://transitous.org/api/ (see also
+https://transitous.org/sources/ for underlying feed/OpenStreetMap attribution).
 """
 
 import logging
@@ -30,6 +35,12 @@ logger = logging.getLogger(__name__)
 
 # both metro areas share the same zone
 PT_TZ = ZoneInfo("Europe/Lisbon")
+
+# surfaced to users in each tool description; transitous wants attribution kept visible
+_ATTRIBUTION = (
+    "Data via Transitous (https://transitous.org), a best-effort, volunteer-run service; "
+    "usage policy: https://transitous.org/api/."
+)
 
 
 def _to_iso(date: Optional[str], time: Optional[str]) -> Optional[str]:
@@ -70,7 +81,8 @@ def register_pt_tools(mcp):
             "Search for stops/stations in Portugal by name. "
             "Covers the Lisbon and Porto metro areas (metro, buses, trams, suburban rail) "
             "via Transitous. Returns stop id, name and coordinates - use the id with "
-            "pt_search_connections and pt_get_departures."
+            "pt_search_connections and pt_get_departures. "
+            + _ATTRIBUTION
         ),
     )
     async def pt_search_stations(
@@ -103,7 +115,8 @@ def register_pt_tools(mcp):
         description=(
             "Plan a public transport connection between two points in the Lisbon or Porto "
             "metro area. Origin and destination are either stop ids (from pt_search_stations) "
-            "or 'lat,lon' coordinates. Returns itineraries with legs, lines, times and transfers."
+            "or 'lat,lon' coordinates. Returns itineraries with legs, lines, times and transfers. "
+            + _ATTRIBUTION
         ),
     )
     async def pt_search_connections(
@@ -161,7 +174,8 @@ def register_pt_tools(mcp):
         description=(
             "Get the departure board for a stop in the Lisbon or Porto metro area. "
             "Needs a stop id from pt_search_stations. Returns upcoming departures with "
-            "line, headsign and real-time times."
+            "line, headsign and real-time times. "
+            + _ATTRIBUTION
         ),
     )
     async def pt_get_departures(
@@ -201,7 +215,8 @@ def register_pt_tools(mcp):
         name="pt_nearby_stations",
         description=(
             "Find stops/stations near coordinates in the Lisbon or Porto metro area. "
-            "Returns the closest stops with id, name and coordinates."
+            "Returns the closest stops with id, name and coordinates. "
+            + _ATTRIBUTION
         ),
     )
     async def pt_nearby_stations(

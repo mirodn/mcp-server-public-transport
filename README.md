@@ -60,6 +60,16 @@ Currently, it integrates APIs from UK, Switzerland, Norway, Belgium, Berlin/Bran
 
 > Portugal coverage is scoped to the Lisbon and Porto metro areas (Metro Lisboa, Carris, Carris Metropolitana, CP suburban; Metro do Porto, STCP) via [Transitous](https://transitous.org), a free MOTIS instance over ingested GTFS feeds. No API key required.
 
+#### Attribution (Transitous)
+
+Lisbon/Porto data is served by [Transitous](https://transitous.org), a volunteer-run,
+best-effort service (limited hosting, no availability or accuracy guarantees). Keep the
+Transitous attribution visible when showing this data to users; underlying feeds, including
+OpenStreetMap, are listed at [transitous.org/sources](https://transitous.org/sources/).
+
+Follow the [Transitous usage policy](https://transitous.org/api/): modest request volume,
+an identifying `User-Agent`, non-commercial / open-source use only.
+
 ## Setup
 
 ### Environment Variables
