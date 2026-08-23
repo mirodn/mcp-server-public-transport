@@ -22,10 +22,36 @@ async def get_tool(mcp, name):
 class TestBETools:
 
     @pytest.mark.unit
-    async def test_be_search_connections(self, mcp):
+    async def test_be_search_connections(self, mcp, monkeypatch):
+        captured = {}
+
+        async def capture_request(url, params):
+            captured.update({"url": url, "params": params})
+            return {"dummy": True}
+
+        monkeypatch.setattr("tools.be.fetch_json", capture_request)
         fn = await get_tool(mcp, "be_search_connections")
-        result = await fn.fn("Brussels", "Antwerp")
+        result = await fn.fn(
+            "Brussels-Luxembourg", "Arlon", date="2026-08-25", time="18:00"
+        )
         assert result == {"dummy": True}
+        assert captured["params"]["date"] == "250826"
+        assert captured["params"]["time"] == "1800"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        ("kwargs", "message"),
+        [
+            ({"date": "25-08-2026"}, "Invalid date format. Use YYYY-MM-DD"),
+            ({"time": "6pm"}, "Invalid time format. Use HH:MM"),
+        ],
+    )
+    async def test_be_search_connections_rejects_invalid_datetime(
+        self, mcp, kwargs, message
+    ):
+        fn = await get_tool(mcp, "be_search_connections")
+        with pytest.raises(ValueError, match=message):
+            await fn.fn("Brussels-Luxembourg", "Arlon", **kwargs)
 
     @pytest.mark.unit
     async def test_be_search_stations(self, mcp):

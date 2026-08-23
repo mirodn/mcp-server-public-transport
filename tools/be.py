@@ -4,6 +4,8 @@ Belgium public transport tools for MCP server using the iRail API
 """
 
 import logging
+import re
+from datetime import date as date_type
 from typing import Any, Dict, Optional
 from typing_extensions import Annotated
 from pydantic import Field
@@ -12,6 +14,23 @@ from core.base import fetch_json, TransportAPIError, validate_station_name
 from config import BE_BASE_URL
 
 logger = logging.getLogger(__name__)
+
+
+def _format_date_for_irail(date: str) -> str:
+    """Convert an ISO date to the DDMMYY format expected by iRail."""
+    try:
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+            raise ValueError
+        return date_type.fromisoformat(date).strftime("%d%m%y")
+    except ValueError as e:
+        raise ValueError("Invalid date format. Use YYYY-MM-DD") from e
+
+
+def _format_time_for_irail(time: str) -> str:
+    """Convert a user-facing time to the HHMM format expected by iRail."""
+    if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", time):
+        raise ValueError("Invalid time format. Use HH:MM")
+    return time.replace(":", "")
 
 
 def register_be_tools(mcp):
@@ -69,9 +88,9 @@ def register_be_tools(mcp):
             "results": int(results or 4),
         }
         if date:
-            params["date"] = date
+            params["date"] = _format_date_for_irail(date)
         if time:
-            params["time"] = time
+            params["time"] = _format_time_for_irail(time)
 
         try:
             logger.info("Searching connections: %s → %s", origin_clean, destination_clean)
