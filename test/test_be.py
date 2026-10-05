@@ -10,7 +10,7 @@ def mcp():
 
 @pytest.fixture(autouse=True)
 def mock_fetch_json(monkeypatch):
-    async def dummy(url, params):
+    async def dummy(url, params, **kwargs):
         return {"dummy": True}
     monkeypatch.setattr("tools.be.fetch_json", dummy)
     return dummy
@@ -25,7 +25,7 @@ class TestBETools:
     async def test_be_search_connections(self, mcp, monkeypatch):
         captured = {}
 
-        async def capture_request(url, params):
+        async def capture_request(url, params, **kwargs):
             captured.update({"url": url, "params": params})
             return {"dummy": True}
 

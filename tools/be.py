@@ -10,7 +10,15 @@ from typing import Any, Dict, Optional
 from typing_extensions import Annotated
 from pydantic import Field
 
-from core.base import fetch_json, TransportAPIError, validate_station_name
+from core.base import (
+    fetch_json,
+    TransportAPIError,
+    validate_station_name,
+    READ_ONLY_TOOL,
+    CACHE_TTL_LIVE,
+    CACHE_TTL_PLAN,
+    CACHE_TTL_STATIC,
+)
 from config import BE_BASE_URL
 
 logger = logging.getLogger(__name__)
@@ -38,6 +46,7 @@ def register_be_tools(mcp):
 
     @mcp.tool(
         name="be_search_connections",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Search train connections in Belgium between two stations. "
             "Powered by iRail API for real-time routes and schedules."
@@ -94,13 +103,14 @@ def register_be_tools(mcp):
 
         try:
             logger.info("Searching connections: %s → %s", origin_clean, destination_clean)
-            return await fetch_json(f"{BE_BASE_URL}/connections/", params)
+            return await fetch_json(f"{BE_BASE_URL}/connections/", params, cache_ttl=CACHE_TTL_PLAN)
         except TransportAPIError as e:
             logger.error("Belgium connection search failed: %s", e, exc_info=True)
             raise
 
     @mcp.tool(
         name="be_search_stations",
+        annotations=READ_ONLY_TOOL,
         description="Search for Belgian train stations by name.",
     )
     async def be_search_stations(
@@ -117,13 +127,14 @@ def register_be_tools(mcp):
 
         try:
             logger.info("Searching stations for: %s", query_clean)
-            return await fetch_json(f"{BE_BASE_URL}/stations/", params)
+            return await fetch_json(f"{BE_BASE_URL}/stations/", params, cache_ttl=CACHE_TTL_STATIC)
         except TransportAPIError as e:
             logger.error("Belgium station search failed: %s", e, exc_info=True)
             raise
 
     @mcp.tool(
         name="be_get_departures",
+        annotations=READ_ONLY_TOOL,
         description="Get live departure board for a Belgian train station.",
     )
     async def be_get_departures(
@@ -146,13 +157,14 @@ def register_be_tools(mcp):
 
         try:
             logger.info("Fetching departures for station: %s", station_clean)
-            return await fetch_json(f"{BE_BASE_URL}/liveboard/", params)
+            return await fetch_json(f"{BE_BASE_URL}/liveboard/", params, cache_ttl=CACHE_TTL_LIVE)
         except TransportAPIError as e:
             logger.error("Belgium liveboard fetch failed: %s", e, exc_info=True)
             raise
 
     @mcp.tool(
         name="be_get_vehicle",
+        annotations=READ_ONLY_TOOL,
         description="Get details about a specific Belgian train vehicle by its ID.",
     )
     async def be_get_vehicle(
@@ -172,7 +184,7 @@ def register_be_tools(mcp):
 
         try:
             logger.info("Fetching vehicle info: %s", vid)
-            return await fetch_json(f"{BE_BASE_URL}/vehicle/", params)
+            return await fetch_json(f"{BE_BASE_URL}/vehicle/", params, cache_ttl=CACHE_TTL_LIVE)
         except TransportAPIError as e:
             logger.error("Belgium vehicle fetch failed: %s", e, exc_info=True)
             raise

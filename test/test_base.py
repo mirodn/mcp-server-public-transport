@@ -1,7 +1,7 @@
 import pytest
 
 from core import base
-from core.base import TransportAPIError, fetch_json, post_json
+from core.base import TransportAPIError, clear_cache, fetch_json, post_json
 
 
 class FakeResponse:
@@ -49,7 +49,9 @@ def session(monkeypatch):
 
     monkeypatch.setattr(base, "get_session", get_session)
     monkeypatch.setattr(base, "_backoff", no_backoff)
-    return install
+    clear_cache()
+    yield install
+    clear_cache()
 
 
 class TestFetchJson:
@@ -91,3 +93,47 @@ class TestFetchJson:
         assert method == "POST"
         assert kwargs["json"] == {"query": "q"}
         assert kwargs["headers"]["X"] == "1"
+
+
+class TestCache:
+
+    @pytest.mark.unit
+    async def test_no_cache_by_default(self, session):
+        s = session(FakeResponse(200, {"n": 1}), FakeResponse(200, {"n": 2}))
+        assert await fetch_json("https://example.test/x") == {"n": 1}
+        assert await fetch_json("https://example.test/x") == {"n": 2}
+        assert len(s.requests) == 2
+
+    @pytest.mark.unit
+    async def test_cache_hit_within_ttl(self, session):
+        s = session(FakeResponse(200, {"n": 1}))
+        first = await fetch_json("https://example.test/x", {"q": "a"}, cache_ttl=60)
+        first["n"] = 99  # callers must not be able to corrupt the cache
+        assert await fetch_json("https://example.test/x", {"q": "a"}, cache_ttl=60) == {"n": 1}
+        assert len(s.requests) == 1
+
+    @pytest.mark.unit
+    async def test_cache_keyed_by_params_and_body(self, session):
+        s = session(*(FakeResponse(200, {"n": i}) for i in range(3)))
+        await fetch_json("https://example.test/x", {"q": "a"}, cache_ttl=60)
+        await fetch_json("https://example.test/x", {"q": "b"}, cache_ttl=60)
+        await post_json("https://example.test/x", {"q": "a"}, cache_ttl=60)
+        assert len(s.requests) == 3
+
+    @pytest.mark.unit
+    async def test_cache_expires(self, session, monkeypatch):
+        now = [1000.0]
+        monkeypatch.setattr(base.time, "monotonic", lambda: now[0])
+        s = session(FakeResponse(200, {"n": 1}), FakeResponse(200, {"n": 2}))
+        await fetch_json("https://example.test/x", cache_ttl=30)
+        now[0] += 31
+        assert await fetch_json("https://example.test/x", cache_ttl=30) == {"n": 2}
+        assert len(s.requests) == 2
+
+    @pytest.mark.unit
+    async def test_errors_not_cached(self, session):
+        s = session(FakeResponse(404, text="nope"), FakeResponse(200, {"ok": True}))
+        with pytest.raises(TransportAPIError):
+            await fetch_json("https://example.test/x", cache_ttl=60)
+        assert await fetch_json("https://example.test/x", cache_ttl=60) == {"ok": True}
+        assert len(s.requests) == 2

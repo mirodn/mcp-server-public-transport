@@ -10,7 +10,7 @@ def mcp():
 
 @pytest.fixture(autouse=True)
 def mock_fetch_json(monkeypatch):
-    async def dummy(url, params):
+    async def dummy(url, params, **kwargs):
         return {"dummy": True}
     monkeypatch.setattr("tools.vbb.fetch_json", dummy)
     return dummy

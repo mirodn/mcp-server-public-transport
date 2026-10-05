@@ -9,7 +9,16 @@ from typing import Any, Dict, Optional
 from typing_extensions import Annotated
 from pydantic import Field
 
-from core.base import fetch_json, validate_station_name, TransportAPIError, format_time_for_api
+from core.base import (
+    fetch_json,
+    validate_station_name,
+    TransportAPIError,
+    format_time_for_api,
+    READ_ONLY_TOOL,
+    CACHE_TTL_LIVE,
+    CACHE_TTL_PLAN,
+    CACHE_TTL_STATIC,
+)
 from config import CH_BASE_URL
 
 logger = logging.getLogger(__name__)
@@ -20,6 +29,7 @@ def register_ch_tools(mcp):
 
     @mcp.tool(
         name="ch_search_connections",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Search for train connections in Switzerland between two stations. "
             "Uses transport.opendata.ch API to provide real-time connection data including "
@@ -70,13 +80,14 @@ def register_ch_tools(mcp):
 
         try:
             logger.info("Searching connections: %s → %s", origin_clean, destination_clean)
-            return await fetch_json(f"{CH_BASE_URL}/connections", params)
+            return await fetch_json(f"{CH_BASE_URL}/connections", params, cache_ttl=CACHE_TTL_PLAN)
         except TransportAPIError as e:
             logger.error("CH connection search failed: %s", e)
             raise
 
     @mcp.tool(
         name="ch_search_stations",
+        annotations=READ_ONLY_TOOL,
         description="Search for Swiss train stations by name or location.",
     )
     async def ch_search_stations(
@@ -100,13 +111,14 @@ def register_ch_tools(mcp):
 
         try:
             logger.info("Searching stations: %s", query_clean)
-            return await fetch_json(f"{CH_BASE_URL}/locations", params)
+            return await fetch_json(f"{CH_BASE_URL}/locations", params, cache_ttl=CACHE_TTL_STATIC)
         except TransportAPIError as e:
             logger.error("CH station search failed: %s", e)
             raise
 
     @mcp.tool(
         name="ch_get_departures",
+        annotations=READ_ONLY_TOOL,
         description="Get departure board for a Swiss train station with real-time information.",
     )
     async def ch_get_departures(
@@ -135,13 +147,14 @@ def register_ch_tools(mcp):
 
         try:
             logger.info("Getting departures for: %s", station_clean)
-            return await fetch_json(f"{CH_BASE_URL}/stationboard", params)
+            return await fetch_json(f"{CH_BASE_URL}/stationboard", params, cache_ttl=CACHE_TTL_LIVE)
         except TransportAPIError as e:
             logger.error("CH departures fetch failed: %s", e)
             raise
 
     @mcp.tool(
         name="ch_nearby_stations",
+        annotations=READ_ONLY_TOOL,
         description="Find nearby Swiss train stations based on coordinates (latitude, longitude).",
     )
     async def ch_nearby_stations(
@@ -169,7 +182,7 @@ def register_ch_tools(mcp):
 
         try:
             logger.info("Finding stations near coordinates")
-            return await fetch_json(f"{CH_BASE_URL}/locations", params)
+            return await fetch_json(f"{CH_BASE_URL}/locations", params, cache_ttl=CACHE_TTL_STATIC)
         except TransportAPIError as e:
             logger.error("CH nearby stations search failed: %s", e)
             raise

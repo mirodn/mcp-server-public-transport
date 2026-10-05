@@ -17,7 +17,7 @@ GEOCODE = [
 
 @pytest.fixture(autouse=True)
 def mock_fetch_json(monkeypatch):
-    async def dummy(url, params):
+    async def dummy(url, params, **kwargs):
         if "geocode" in url:
             return GEOCODE
         return {"dummy": True}

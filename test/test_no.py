@@ -17,11 +17,11 @@ def calls():
 
 @pytest.fixture(autouse=True)
 def mock_http(monkeypatch, calls):
-    async def dummy_fetch(url, params, headers=None):
+    async def dummy_fetch(url, params, headers=None, **kwargs):
         calls.append(("GET", url, params, headers))
         return {"features": []}
 
-    async def dummy_post(url, body, headers=None):
+    async def dummy_post(url, body, headers=None, **kwargs):
         calls.append(("POST", url, body, headers))
         return {"data": {"dummy": True}}
 
@@ -66,7 +66,7 @@ class TestNOTools:
 
     @pytest.mark.unit
     async def test_graphql_errors_raise(self, mcp, monkeypatch):
-        async def failing_post(url, body, headers=None):
+        async def failing_post(url, body, headers=None, **kwargs):
             return {"errors": [{"message": "boom"}]}
         monkeypatch.setattr("tools.no.post_json", failing_post)
 

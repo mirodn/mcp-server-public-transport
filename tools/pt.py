@@ -28,7 +28,16 @@ from typing import Any, Dict, List, Optional
 from typing_extensions import Annotated
 from pydantic import Field
 
-from core.base import fetch_json, validate_station_name, TransportAPIError, format_time_for_api
+from core.base import (
+    fetch_json,
+    validate_station_name,
+    TransportAPIError,
+    format_time_for_api,
+    READ_ONLY_TOOL,
+    CACHE_TTL_LIVE,
+    CACHE_TTL_PLAN,
+    CACHE_TTL_STATIC,
+)
 from config import PT_BASE_URL
 
 logger = logging.getLogger(__name__)
@@ -77,6 +86,7 @@ def register_pt_tools(mcp):
 
     @mcp.tool(
         name="pt_search_stations",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Search for stops/stations in Portugal by name. "
             "Covers the Lisbon and Porto metro areas (metro, buses, trams, suburban rail) "
@@ -104,7 +114,7 @@ def register_pt_tools(mcp):
 
         try:
             logger.info("Searching PT stations: %s", query_clean)
-            hits = await fetch_json(f"{PT_BASE_URL}/geocode", params)
+            hits = await fetch_json(f"{PT_BASE_URL}/geocode", params, cache_ttl=CACHE_TTL_STATIC)
             return _pt_only(hits, int(limit or 10))
         except TransportAPIError as e:
             logger.error("PT station search failed: %s", e)
@@ -112,6 +122,7 @@ def register_pt_tools(mcp):
 
     @mcp.tool(
         name="pt_search_connections",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Plan a public transport connection between two points in the Lisbon or Porto "
             "metro area. Origin and destination are either stop ids (from pt_search_stations) "
@@ -164,13 +175,14 @@ def register_pt_tools(mcp):
 
         try:
             logger.info("Planning PT connection: %s -> %s", origin_clean, destination_clean)
-            return await fetch_json(f"{PT_BASE_URL}/plan", params)
+            return await fetch_json(f"{PT_BASE_URL}/plan", params, cache_ttl=CACHE_TTL_PLAN)
         except TransportAPIError as e:
             logger.error("PT connection search failed: %s", e)
             raise
 
     @mcp.tool(
         name="pt_get_departures",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Get the departure board for a stop in the Lisbon or Porto metro area. "
             "Needs a stop id from pt_search_stations. Returns upcoming departures with "
@@ -206,13 +218,14 @@ def register_pt_tools(mcp):
 
         try:
             logger.info("Getting PT departures for stop: %s", stop_id_clean)
-            return await fetch_json(f"{PT_BASE_URL}/stoptimes", params)
+            return await fetch_json(f"{PT_BASE_URL}/stoptimes", params, cache_ttl=CACHE_TTL_LIVE)
         except TransportAPIError as e:
             logger.error("PT departures fetch failed: %s", e)
             raise
 
     @mcp.tool(
         name="pt_nearby_stations",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Find stops/stations near coordinates in the Lisbon or Porto metro area. "
             "Returns the closest stops with id, name and coordinates. "
@@ -241,7 +254,7 @@ def register_pt_tools(mcp):
 
         try:
             logger.info("Finding PT stations near provided coordinates")
-            hits = await fetch_json(f"{PT_BASE_URL}/reverse-geocode", params)
+            hits = await fetch_json(f"{PT_BASE_URL}/reverse-geocode", params, cache_ttl=CACHE_TTL_STATIC)
             return _pt_only(hits, int(results or 8))
         except TransportAPIError as e:
             logger.error("PT nearby stations search failed: %s", e)

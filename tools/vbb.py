@@ -18,7 +18,14 @@ from typing import Any, Dict, Optional
 from typing_extensions import Annotated
 from pydantic import Field
 
-from core.base import fetch_json, TransportAPIError
+from core.base import (
+    fetch_json,
+    TransportAPIError,
+    READ_ONLY_TOOL,
+    CACHE_TTL_LIVE,
+    CACHE_TTL_PLAN,
+    CACHE_TTL_STATIC,
+)
 from config import VBB_BASE_URL
 
 logger = logging.getLogger(__name__)
@@ -29,6 +36,7 @@ def register_vbb_tools(mcp):
 
     @mcp.tool(
         name="vbb_search_locations",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Search for stops/stations, POIs and addresses in Berlin/Brandenburg. "
             "Uses v6.vbb.transport.rest API to find locations matching a query. "
@@ -76,13 +84,14 @@ def register_vbb_tools(mcp):
 
         try:
             logger.info("Searching VBB locations: %s", query_clean)
-            return await fetch_json(f"{VBB_BASE_URL}/locations", params)
+            return await fetch_json(f"{VBB_BASE_URL}/locations", params, cache_ttl=CACHE_TTL_STATIC)
         except TransportAPIError as e:
             logger.error("VBB location search failed: %s", e)
             raise
 
     @mcp.tool(
         name="vbb_get_departures",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Get departures at a stop/station in Berlin/Brandenburg. "
             "Returns real-time departure information including delays, platform, and line details."
@@ -127,13 +136,14 @@ def register_vbb_tools(mcp):
 
         try:
             logger.info("Getting VBB departures for stop: %s", stop_id_clean)
-            return await fetch_json(f"{VBB_BASE_URL}/stops/{stop_id_clean}/departures", params)
+            return await fetch_json(f"{VBB_BASE_URL}/stops/{stop_id_clean}/departures", params, cache_ttl=CACHE_TTL_LIVE)
         except TransportAPIError as e:
             logger.error("VBB departures fetch failed: %s", e)
             raise
 
     @mcp.tool(
         name="vbb_get_arrivals",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Get arrivals at a stop/station in Berlin/Brandenburg. "
             "Returns real-time arrival information including delays, platform, and line details."
@@ -172,13 +182,14 @@ def register_vbb_tools(mcp):
 
         try:
             logger.info("Getting VBB arrivals for stop: %s", stop_id_clean)
-            return await fetch_json(f"{VBB_BASE_URL}/stops/{stop_id_clean}/arrivals", params)
+            return await fetch_json(f"{VBB_BASE_URL}/stops/{stop_id_clean}/arrivals", params, cache_ttl=CACHE_TTL_LIVE)
         except TransportAPIError as e:
             logger.error("VBB arrivals fetch failed: %s", e)
             raise
 
     @mcp.tool(
         name="vbb_search_journeys",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Search for journeys between two locations in Berlin/Brandenburg. "
             "Returns connections with real-time data, transfers, duration, and line information. "
@@ -233,13 +244,14 @@ def register_vbb_tools(mcp):
 
         try:
             logger.info("Searching VBB journeys: %s -> %s", origin_clean, destination_clean)
-            return await fetch_json(f"{VBB_BASE_URL}/journeys", params)
+            return await fetch_json(f"{VBB_BASE_URL}/journeys", params, cache_ttl=CACHE_TTL_PLAN)
         except TransportAPIError as e:
             logger.error("VBB journey search failed: %s", e)
             raise
 
     @mcp.tool(
         name="vbb_nearby_stations",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Find stops/stations near a location in Berlin/Brandenburg by coordinates. "
             "Returns nearby stops with distance information."
@@ -274,7 +286,7 @@ def register_vbb_tools(mcp):
 
         try:
             logger.info("Finding VBB stations near provided coordinates")
-            return await fetch_json(f"{VBB_BASE_URL}/locations/nearby", params)
+            return await fetch_json(f"{VBB_BASE_URL}/locations/nearby", params, cache_ttl=CACHE_TTL_STATIC)
         except TransportAPIError as e:
             logger.error("VBB nearby stations search failed: %s", e)
             raise

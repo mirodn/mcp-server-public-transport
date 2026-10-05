@@ -22,7 +22,15 @@ import logging
 from pydantic import Field
 from typing_extensions import Annotated
 
-from core.base import TransportAPIError, fetch_json, post_json
+from core.base import (
+    CACHE_TTL_LIVE,
+    CACHE_TTL_PLAN,
+    CACHE_TTL_STATIC,
+    READ_ONLY_TOOL,
+    TransportAPIError,
+    fetch_json,
+    post_json,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,10 +53,11 @@ COMMON_HEADERS: dict[str, str] = {
 async def _post_graphql(
     query: str,
     variables: dict[str, object] | None = None,
+    cache_ttl: float = 0,
 ) -> dict[str, object]:
     """POST a GraphQL query to Entur Journey Planner v3 and return the `data` field."""
     payload = {"query": query, "variables": variables or {}}
-    data = await post_json(NO_JP_BASE_URL, payload, headers=COMMON_HEADERS)
+    data = await post_json(NO_JP_BASE_URL, payload, headers=COMMON_HEADERS, cache_ttl=cache_ttl)
     if data.get("errors"):
         raise TransportAPIError(f"Entur GraphQL errors: {data['errors']}")
     return data.get("data", {})
@@ -62,6 +71,7 @@ def register_no_tools(mcp):
 
     @mcp.tool(
         name="no_search_places",
+        annotations=READ_ONLY_TOOL,
         description="Autocomplete search across stops/addresses/POIs in Norway via Entur Geocoder.",
     )
     async def no_search_places(
@@ -79,10 +89,12 @@ def register_no_tools(mcp):
             NO_GEOCODER_AUTOCOMPLETE_URL,
             params,
             headers={"ET-Client-Name": NO_CLIENT_NAME},
+            cache_ttl=CACHE_TTL_STATIC,
         )
 
     @mcp.tool(
         name="no_stop_departures",
+        annotations=READ_ONLY_TOOL,
         description="Upcoming departures for a StopPlace ID (e.g., 'NSR:StopPlace:58368').",
     )
     async def no_stop_departures(
@@ -113,10 +125,11 @@ def register_no_tools(mcp):
         """
         variables = {"id": stop_place_id.strip(), "limit": int(limit or 10)}
         logger.info("Entur stop departures: %s (limit=%s)", variables["id"], variables["limit"])
-        return await _post_graphql(query, variables)
+        return await _post_graphql(query, variables, cache_ttl=CACHE_TTL_LIVE)
 
     @mcp.tool(
         name="no_trip",
+        annotations=READ_ONLY_TOOL,
         description="Door-to-door trip planning between two StopPlaces (NSR IDs).",
     )
     async def no_trip(
@@ -164,10 +177,11 @@ def register_no_tools(mcp):
             "🇳🇴 Entur trip: %s -> %s (results=%s, dateTime=%s)",
             variables["from"], variables["to"], variables["results"], variables["dateTime"]
         )
-        return await _post_graphql(query, variables)
+        return await _post_graphql(query, variables, cache_ttl=CACHE_TTL_PLAN)
 
     @mcp.tool(
         name="no_nearest_stops",
+        annotations=READ_ONLY_TOOL,
         description="Find nearest StopPlaces for a coordinate (lat, lon) within a radius in meters.",
     )
     async def no_nearest_stops(
@@ -206,7 +220,7 @@ def register_no_tools(mcp):
             "Entur nearest stops: lat=%s lon=%s radius=%s first=%s",
             variables["lat"], variables["lon"], variables["radius"], variables["first"]
         )
-        return await _post_graphql(query, variables)
+        return await _post_graphql(query, variables, cache_ttl=CACHE_TTL_STATIC)
 
     # IMPORTANT: return functions (consistent with other modules)
     return [no_search_places, no_stop_departures, no_trip, no_nearest_stops]
