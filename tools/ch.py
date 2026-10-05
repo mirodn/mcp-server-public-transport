@@ -19,9 +19,85 @@ from core.base import (
     CACHE_TTL_PLAN,
     CACHE_TTL_STATIC,
 )
+from core.models import (
+    Departure,
+    DepartureBoard,
+    Journey,
+    JourneyList,
+    Leg,
+    Stop,
+    StopTime,
+    compact,
+    iso,
+    journey_from_legs,
+    minutes_between,
+)
 from config import CH_BASE_URL
 
 logger = logging.getLogger(__name__)
+
+_RAW_FIELD = Field(description="Return the unmodified upstream API response instead of the compact format.")
+
+
+def _ch_line(journey: Dict[str, Any]) -> Optional[str]:
+    number = journey.get("number")
+    # long-distance trains come zero-padded ("EC 000019")
+    if number and number.isdigit():
+        number = number.lstrip("0") or number
+    parts = [journey.get("category"), number]
+    return " ".join(p for p in parts if p) or None
+
+
+def _ch_stop(station: Optional[Dict[str, Any]]) -> Stop:
+    station = station or {}
+    return Stop(id=station.get("id"), name=station.get("name"))
+
+
+def _ch_stop_time(checkpoint: Dict[str, Any], kind: str) -> StopTime:
+    """Map a transport.opendata.ch checkpoint; kind is 'departure' or 'arrival'."""
+    prognosis = checkpoint.get("prognosis") or {}
+    planned = iso(checkpoint.get(kind))
+    expected = iso(prognosis.get(kind))
+    delay = minutes_between(planned, expected) if expected else checkpoint.get("delay")
+    return StopTime(
+        stop=_ch_stop(checkpoint.get("station")),
+        planned=planned,
+        expected=expected,
+        delay_min=delay,
+        # prognosis carries the platform only when it changed
+        platform=prognosis.get("platform") or checkpoint.get("platform"),
+    )
+
+
+def _ch_departure(entry: Dict[str, Any]) -> Departure:
+    stop_time = _ch_stop_time(entry.get("stop") or {}, "departure")
+    return Departure(
+        line=_ch_line(entry),
+        category=entry.get("category"),
+        destination=entry.get("to"),
+        planned=stop_time.planned,
+        expected=stop_time.expected,
+        delay_min=stop_time.delay_min,
+        platform=stop_time.platform,
+        operator=entry.get("operator"),
+    )
+
+
+def _ch_journey(connection: Dict[str, Any]) -> Journey:
+    legs = []
+    for section in connection.get("sections") or []:
+        journey = section.get("journey")
+        legs.append(
+            Leg(
+                walk=journey is None,
+                line=_ch_line(journey) if journey else None,
+                category=journey.get("category") if journey else None,
+                direction=journey.get("to") if journey else None,
+                departure=_ch_stop_time(section.get("departure") or {}, "departure"),
+                arrival=_ch_stop_time(section.get("arrival") or {}, "arrival"),
+            )
+        )
+    return journey_from_legs(legs, transfers=connection.get("transfers") or 0)
 
 
 def register_ch_tools(mcp):
@@ -33,7 +109,8 @@ def register_ch_tools(mcp):
         description=(
             "Search for train connections in Switzerland between two stations. "
             "Uses transport.opendata.ch API to provide real-time connection data including "
-            "departure times, duration, platforms, and transfers."
+            "departure times, duration, platforms, and transfers. Returns a compact list of "
+            "journeys with legs; set raw=true for the full upstream response."
         ),
     )
     async def ch_search_connections(
@@ -61,6 +138,7 @@ def register_ch_tools(mcp):
             Optional[bool],
             Field(description="If true, interpret 'time' as arrival time (default false)."),
         ] = False,
+        raw: Annotated[bool, _RAW_FIELD] = False,
     ) -> Dict[str, Any]:
         origin_clean = validate_station_name(origin)
         destination_clean = validate_station_name(destination)
@@ -80,10 +158,15 @@ def register_ch_tools(mcp):
 
         try:
             logger.info("Searching connections: %s → %s", origin_clean, destination_clean)
-            return await fetch_json(f"{CH_BASE_URL}/connections", params, cache_ttl=CACHE_TTL_PLAN)
+            data = await fetch_json(f"{CH_BASE_URL}/connections", params, cache_ttl=CACHE_TTL_PLAN)
         except TransportAPIError as e:
             logger.error("CH connection search failed: %s", e)
             raise
+
+        if raw:
+            return data
+        journeys = [_ch_journey(c) for c in data.get("connections") or []]
+        return compact(JourneyList(journeys=journeys))
 
     @mcp.tool(
         name="ch_search_stations",
@@ -119,7 +202,10 @@ def register_ch_tools(mcp):
     @mcp.tool(
         name="ch_get_departures",
         annotations=READ_ONLY_TOOL,
-        description="Get departure board for a Swiss train station with real-time information.",
+        description=(
+            "Get departure board for a Swiss train station with real-time information "
+            "(planned/expected time, delay, platform). Set raw=true for the full upstream response."
+        ),
     )
     async def ch_get_departures(
         station: Annotated[
@@ -134,6 +220,7 @@ def register_ch_tools(mcp):
             Optional[str],
             Field(description="Datetime ISO string supported by API (optional)."),
         ] = None,
+        raw: Annotated[bool, _RAW_FIELD] = False,
     ) -> Dict[str, Any]:
         station_clean = validate_station_name(station)
 
@@ -147,10 +234,18 @@ def register_ch_tools(mcp):
 
         try:
             logger.info("Getting departures for: %s", station_clean)
-            return await fetch_json(f"{CH_BASE_URL}/stationboard", params, cache_ttl=CACHE_TTL_LIVE)
+            data = await fetch_json(f"{CH_BASE_URL}/stationboard", params, cache_ttl=CACHE_TTL_LIVE)
         except TransportAPIError as e:
             logger.error("CH departures fetch failed: %s", e)
             raise
+
+        if raw:
+            return data
+        board = DepartureBoard(
+            station=_ch_stop(data.get("station")),
+            departures=[_ch_departure(e) for e in data.get("stationboard") or []],
+        )
+        return compact(board)
 
     @mcp.tool(
         name="ch_nearby_stations",
