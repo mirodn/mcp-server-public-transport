@@ -17,13 +17,12 @@ Notes:
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from typing_extensions import Annotated
-from pydantic import Field
 
-import aiohttp
-from core.base import TransportAPIError, get_session
+from pydantic import Field
+from typing_extensions import Annotated
+
+from core.base import TransportAPIError, fetch_json, post_json
 
 logger = logging.getLogger(__name__)
 
@@ -41,65 +40,18 @@ COMMON_HEADERS: dict[str, str] = {
 }
 
 # -----------------------------------------------------------------------------
-# Timeouts & simple retry/backoff
-# -----------------------------------------------------------------------------
-DEFAULT_TOTAL_TIMEOUT = 30  # seconds
-DEFAULT_CONNECT_TIMEOUT = 10
-
-
-def _make_timeout(total: int = DEFAULT_TOTAL_TIMEOUT) -> aiohttp.ClientTimeout:
-    return aiohttp.ClientTimeout(
-        total=total,
-        connect=DEFAULT_CONNECT_TIMEOUT,
-        sock_connect=DEFAULT_CONNECT_TIMEOUT,
-        sock_read=max(5, total - 5),
-    )
-
-
-# -----------------------------------------------------------------------------
 # GraphQL helper
 # -----------------------------------------------------------------------------
 async def _post_graphql(
     query: str,
     variables: dict[str, object] | None = None,
-    timeout: int = DEFAULT_TOTAL_TIMEOUT,
-    tries: int = 3,
 ) -> dict[str, object]:
     """POST a GraphQL query to Entur Journey Planner v3 and return the `data` field."""
     payload = {"query": query, "variables": variables or {}}
-
-    for attempt in range(1, tries + 1):
-        try:
-            session = await get_session()
-            async with session.post(
-                NO_JP_BASE_URL,
-                json=payload,
-                headers=COMMON_HEADERS,
-                timeout=_make_timeout(timeout),
-            ) as resp:
-                # Retry on rate limit or server errors
-                if resp.status == 429 or resp.status >= 500:
-                    text = await resp.text()
-                    if attempt < tries:
-                        await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
-                        continue
-                    raise TransportAPIError(f"Entur GraphQL HTTP {resp.status}: {text}")
-
-                if resp.status >= 400:
-                    text = await resp.text()
-                    raise TransportAPIError(f"Entur GraphQL HTTP {resp.status}: {text}")
-
-                data = await resp.json()
-                if "errors" in data and data["errors"]:
-                    raise TransportAPIError(f"Entur GraphQL errors: {data['errors']}")
-                return data.get("data", {})
-        except (asyncio.TimeoutError, aiohttp.ServerTimeoutError) as e:
-            if attempt < tries:
-                await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
-                continue
-            raise TransportAPIError(f"Entur GraphQL timeout after {tries} attempt(s): {e}") from e
-
-    raise TransportAPIError("Entur GraphQL: exhausted retries without response")
+    data = await post_json(NO_JP_BASE_URL, payload, headers=COMMON_HEADERS)
+    if data.get("errors"):
+        raise TransportAPIError(f"Entur GraphQL errors: {data['errors']}")
+    return data.get("data", {})
 
 
 # -----------------------------------------------------------------------------
@@ -123,35 +75,11 @@ def register_no_tools(mcp):
         params = {"text": text.strip(), "lang": (lang or "en"), "size": int(size or 10)}
         logger.info("🇳🇴 Entur geocoder autocomplete: %r", params)
 
-        tries = 3
-        for attempt in range(1, tries + 1):
-            try:
-                session = await get_session()
-                async with session.get(
-                    NO_GEOCODER_AUTOCOMPLETE_URL,
-                    params=params,
-                    headers={"ET-Client-Name": NO_CLIENT_NAME, "Accept": "application/json"},
-                    timeout=_make_timeout(),
-                ) as resp:
-                    if resp.status == 429 or resp.status >= 500:
-                        if attempt < tries:
-                            await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
-                            continue
-                        text_body = await resp.text()
-                        raise TransportAPIError(f"Entur Geocoder HTTP {resp.status}: {text_body}")
-
-                    if resp.status >= 400:
-                        text_body = await resp.text()
-                        raise TransportAPIError(f"Entur Geocoder HTTP {resp.status}: {text_body}")
-
-                    return await resp.json()
-            except (asyncio.TimeoutError, aiohttp.ServerTimeoutError) as e:
-                if attempt < tries:
-                    await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
-                    continue
-                raise TransportAPIError(f"Entur Geocoder timeout after {tries} attempt(s): {e}") from e
-
-        raise TransportAPIError("Entur Geocoder: exhausted retries without response")
+        return await fetch_json(
+            NO_GEOCODER_AUTOCOMPLETE_URL,
+            params,
+            headers={"ET-Client-Name": NO_CLIENT_NAME},
+        )
 
     @mcp.tool(
         name="no_stop_departures",

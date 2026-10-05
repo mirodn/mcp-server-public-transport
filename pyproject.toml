@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mcp-server-public-transport"
 version = "0.1.4"
-description = "An MCP-compatible server for querying public transport data in Europe (UK, CH, BE, NO)."
+description = "An MCP-compatible server for querying public transport data in Europe (UK, CH, BE, NO, Berlin/Brandenburg, PT)."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -27,7 +27,6 @@ dependencies = [
     "python-dotenv>=1.1.1",
     "typing-extensions>=4.8",
     "pydantic>=2.6",
-    "requests>=2.32.4",
 ]
 
 [project.optional-dependencies]
@@ -40,12 +39,6 @@ dev = [
 [project.urls]
 Homepage = "https://github.com/mirodn/mcp-server-public-transport"
 Repository = "https://github.com/mirodn/mcp-server-public-transport"
-
-[tool.pytest.ini_options]
-addopts = "--maxfail=1 --disable-warnings -q"
-testpaths = [
-    "tests"
-]
 
 [dependency-groups]
 dev = [

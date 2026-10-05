@@ -129,7 +129,7 @@ Replace `/ABSOLUTE/PATH/TO/PARENT/FOLDER/mcp-server-public-transport` with the a
 3. **Set environment variables**
 
     ```bash
-    cp .env.example .env
+    cp env.example .env
     ```
 
 4. **Run the server**

@@ -1,8 +1,7 @@
-# test/conftest.py
 import sys
 from pathlib import Path
 
-# Add src or tools to PYTHONPATH
-src_path = Path(__file__).parent.parent / "src"
-if str(src_path) not in sys.path:
-    sys.path.insert(0, str(src_path))
+# Make the repo root (server.py, config.py, core/, tools/) importable
+root_path = Path(__file__).parent.parent
+if str(root_path) not in sys.path:
+    sys.path.insert(0, str(root_path))
