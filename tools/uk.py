@@ -10,7 +10,7 @@ from typing import Any, Dict
 from typing_extensions import Annotated
 from pydantic import Field
 
-from core.base import fetch_json, TransportAPIError
+from core.base import fetch_json, TransportAPIError, READ_ONLY_TOOL, CACHE_TTL_LIVE
 from config import UK_BASE_URL
 
 logger = logging.getLogger(__name__)
@@ -21,6 +21,7 @@ def register_uk_tools(mcp):
 
     @mcp.tool(
         name="uk_live_departures",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Get live departure information for a UK train station using its CRS code "
             "(e.g., 'PAD' for London Paddington, 'MAN' for Manchester Piccadilly). "
@@ -58,7 +59,7 @@ def register_uk_tools(mcp):
 
         try:
             logger.info("🇬🇧 Fetching live departures for UK station: %s", code)
-            return await fetch_json(url, params)
+            return await fetch_json(url, params, cache_ttl=CACHE_TTL_LIVE)
         except TransportAPIError as e:
             logger.error("UK live departures fetch failed: %s", e, exc_info=True)
             raise

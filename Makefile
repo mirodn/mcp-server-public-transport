@@ -3,7 +3,7 @@
 PYTHON = uv run --env-file .env python
 
 run:
-	$(PYTHON) src/server.py
+	$(PYTHON) server.py
 
 build:
 	uv build

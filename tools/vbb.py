@@ -14,14 +14,122 @@ No authentication required. Rate limit: 100 requests/minute.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from typing_extensions import Annotated
 from pydantic import Field
 
-from core.base import fetch_json, TransportAPIError
+from core.base import (
+    fetch_json,
+    TransportAPIError,
+    READ_ONLY_TOOL,
+    CACHE_TTL_LIVE,
+    CACHE_TTL_PLAN,
+    CACHE_TTL_STATIC,
+)
+from core.models import (
+    RAW_FIELD,
+    Arrival,
+    ArrivalBoard,
+    Departure,
+    DepartureBoard,
+    JourneyList,
+    Leg,
+    Stop,
+    StopTime,
+    compact,
+    journey_from_legs,
+    minutes_between,
+    strip_html,
+)
 from config import VBB_BASE_URL
 
 logger = logging.getLogger(__name__)
+
+def _vbb_stop(stop: Optional[Dict[str, Any]]) -> Stop:
+    stop = stop or {}
+    return Stop(id=stop.get("id"), name=stop.get("name"))
+
+
+def _vbb_warnings(remarks: Optional[List[Dict[str, Any]]]) -> List[str]:
+    """Keep only disruption warnings; hints like 'Bicycle conveyance' are noise."""
+    texts: List[str] = []
+    for remark in remarks or []:
+        if remark.get("type") != "warning":
+            continue
+        text = strip_html(remark.get("text") or remark.get("summary") or "")
+        if text and text not in texts:
+            texts.append(text)
+    return texts
+
+
+def _vbb_line(line: Optional[Dict[str, Any]]) -> Dict[str, Optional[str]]:
+    line = line or {}
+    return {
+        "line": line.get("name"),
+        "category": line.get("productName"),
+        "operator": (line.get("operator") or {}).get("name"),
+    }
+
+
+def _vbb_stop_time(stop: Optional[Dict[str, Any]], planned: Optional[str], expected: Optional[str],
+                   planned_platform: Optional[str], platform: Optional[str]) -> StopTime:
+    return StopTime(
+        stop=_vbb_stop(stop),
+        planned=planned,
+        expected=expected,
+        delay_min=minutes_between(planned, expected) if expected else None,
+        platform=platform or planned_platform,
+    )
+
+
+def _vbb_departure(entry: Dict[str, Any]) -> Departure:
+    planned = entry.get("plannedWhen")
+    expected = entry.get("when")
+    return Departure(
+        **_vbb_line(entry.get("line")),
+        destination=entry.get("direction"),
+        planned=planned,
+        expected=expected,
+        delay_min=minutes_between(planned, expected) if expected else None,
+        platform=entry.get("platform") or entry.get("plannedPlatform"),
+        cancelled=entry.get("cancelled") or None,
+        remarks=_vbb_warnings(entry.get("remarks")),
+    )
+
+
+def _vbb_arrival(entry: Dict[str, Any]) -> Arrival:
+    planned = entry.get("plannedWhen")
+    expected = entry.get("when")
+    return Arrival(
+        **_vbb_line(entry.get("line")),
+        origin=entry.get("provenance"),
+        planned=planned,
+        expected=expected,
+        delay_min=minutes_between(planned, expected) if expected else None,
+        platform=entry.get("platform") or entry.get("plannedPlatform"),
+        cancelled=entry.get("cancelled") or None,
+        remarks=_vbb_warnings(entry.get("remarks")),
+    )
+
+
+def _vbb_leg(leg: Dict[str, Any]) -> Leg:
+    line = _vbb_line(leg.get("line"))
+    return Leg(
+        walk=bool(leg.get("walking")),
+        line=line["line"],
+        category=line["category"],
+        direction=leg.get("direction"),
+        departure=_vbb_stop_time(
+            leg.get("origin"), leg.get("plannedDeparture"), leg.get("departure"),
+            leg.get("plannedDeparturePlatform"), leg.get("departurePlatform"),
+        ),
+        arrival=_vbb_stop_time(
+            leg.get("destination"), leg.get("plannedArrival"), leg.get("arrival"),
+            leg.get("plannedArrivalPlatform"), leg.get("arrivalPlatform"),
+        ),
+        cancelled=leg.get("cancelled") or None,
+        remarks=_vbb_warnings(leg.get("remarks")),
+    )
 
 
 def register_vbb_tools(mcp):
@@ -29,6 +137,7 @@ def register_vbb_tools(mcp):
 
     @mcp.tool(
         name="vbb_search_locations",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Search for stops/stations, POIs and addresses in Berlin/Brandenburg. "
             "Uses v6.vbb.transport.rest API to find locations matching a query. "
@@ -76,16 +185,18 @@ def register_vbb_tools(mcp):
 
         try:
             logger.info("Searching VBB locations: %s", query_clean)
-            return await fetch_json(f"{VBB_BASE_URL}/locations", params)
+            return await fetch_json(f"{VBB_BASE_URL}/locations", params, cache_ttl=CACHE_TTL_STATIC)
         except TransportAPIError as e:
             logger.error("VBB location search failed: %s", e)
             raise
 
     @mcp.tool(
         name="vbb_get_departures",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Get departures at a stop/station in Berlin/Brandenburg. "
-            "Returns real-time departure information including delays, platform, and line details."
+            "Returns real-time departure information including delays, platform, line details "
+            "and disruption warnings. Set raw=true for the full upstream response."
         ),
     )
     async def vbb_get_departures(
@@ -109,6 +220,7 @@ def register_vbb_tools(mcp):
             Optional[str],
             Field(description="Filter departures by direction (stop ID)."),
         ] = None,
+        raw: Annotated[bool, RAW_FIELD] = False,
     ) -> Dict[str, Any]:
         stop_id_clean = stop_id.strip()
         if not stop_id_clean:
@@ -127,16 +239,26 @@ def register_vbb_tools(mcp):
 
         try:
             logger.info("Getting VBB departures for stop: %s", stop_id_clean)
-            return await fetch_json(f"{VBB_BASE_URL}/stops/{stop_id_clean}/departures", params)
+            data = await fetch_json(f"{VBB_BASE_URL}/stops/{stop_id_clean}/departures", params, cache_ttl=CACHE_TTL_LIVE)
         except TransportAPIError as e:
             logger.error("VBB departures fetch failed: %s", e)
             raise
 
+        if raw:
+            return data
+        # HAFAS treats `results` as a rough target, so trim to what was asked for
+        entries = (data.get("departures") or [])[: results or None]
+        station = _vbb_stop(entries[0].get("stop")) if entries else Stop(id=stop_id_clean)
+        board = DepartureBoard(station=station, departures=[_vbb_departure(e) for e in entries])
+        return compact(board)
+
     @mcp.tool(
         name="vbb_get_arrivals",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Get arrivals at a stop/station in Berlin/Brandenburg. "
-            "Returns real-time arrival information including delays, platform, and line details."
+            "Returns real-time arrival information including delays, platform, line details "
+            "and disruption warnings. Set raw=true for the full upstream response."
         ),
     )
     async def vbb_get_arrivals(
@@ -156,6 +278,7 @@ def register_vbb_tools(mcp):
             Optional[int],
             Field(description="Max number of arrivals.", ge=1, le=100),
         ] = None,
+        raw: Annotated[bool, RAW_FIELD] = False,
     ) -> Dict[str, Any]:
         stop_id_clean = stop_id.strip()
         if not stop_id_clean:
@@ -172,17 +295,27 @@ def register_vbb_tools(mcp):
 
         try:
             logger.info("Getting VBB arrivals for stop: %s", stop_id_clean)
-            return await fetch_json(f"{VBB_BASE_URL}/stops/{stop_id_clean}/arrivals", params)
+            data = await fetch_json(f"{VBB_BASE_URL}/stops/{stop_id_clean}/arrivals", params, cache_ttl=CACHE_TTL_LIVE)
         except TransportAPIError as e:
             logger.error("VBB arrivals fetch failed: %s", e)
             raise
 
+        if raw:
+            return data
+        # HAFAS treats `results` as a rough target, so trim to what was asked for
+        entries = (data.get("arrivals") or [])[: results or None]
+        station = _vbb_stop(entries[0].get("stop")) if entries else Stop(id=stop_id_clean)
+        board = ArrivalBoard(station=station, arrivals=[_vbb_arrival(e) for e in entries])
+        return compact(board)
+
     @mcp.tool(
         name="vbb_search_journeys",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Search for journeys between two locations in Berlin/Brandenburg. "
             "Returns connections with real-time data, transfers, duration, and line information. "
-            "Supports departure or arrival time based planning."
+            "Supports departure or arrival time based planning. "
+            "Returns a compact list of journeys with legs; set raw=true for the full upstream response."
         ),
     )
     async def vbb_search_journeys(
@@ -210,6 +343,7 @@ def register_vbb_tools(mcp):
             Optional[int],
             Field(description="Maximum number of transfers.", ge=0, le=10),
         ] = None,
+        raw: Annotated[bool, RAW_FIELD] = False,
     ) -> Dict[str, Any]:
         origin_clean = origin.strip()
         destination_clean = destination.strip()
@@ -233,13 +367,25 @@ def register_vbb_tools(mcp):
 
         try:
             logger.info("Searching VBB journeys: %s -> %s", origin_clean, destination_clean)
-            return await fetch_json(f"{VBB_BASE_URL}/journeys", params)
+            data = await fetch_json(f"{VBB_BASE_URL}/journeys", params, cache_ttl=CACHE_TTL_PLAN)
         except TransportAPIError as e:
             logger.error("VBB journey search failed: %s", e)
             raise
 
+        if raw:
+            return data
+        journeys = [
+            journey_from_legs(
+                [_vbb_leg(leg) for leg in j.get("legs") or []],
+                remarks=_vbb_warnings(j.get("remarks")),
+            )
+            for j in (data.get("journeys") or [])[: results or None]
+        ]
+        return compact(JourneyList(journeys=journeys))
+
     @mcp.tool(
         name="vbb_nearby_stations",
+        annotations=READ_ONLY_TOOL,
         description=(
             "Find stops/stations near a location in Berlin/Brandenburg by coordinates. "
             "Returns nearby stops with distance information."
@@ -274,7 +420,7 @@ def register_vbb_tools(mcp):
 
         try:
             logger.info("Finding VBB stations near provided coordinates")
-            return await fetch_json(f"{VBB_BASE_URL}/locations/nearby", params)
+            return await fetch_json(f"{VBB_BASE_URL}/locations/nearby", params, cache_ttl=CACHE_TTL_STATIC)
         except TransportAPIError as e:
             logger.error("VBB nearby stations search failed: %s", e)
             raise
