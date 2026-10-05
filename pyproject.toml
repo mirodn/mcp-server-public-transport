@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-server-public-transport"
-version = "0.1.4"
+version = "0.2.0"
 description = "An MCP-compatible server for querying public transport data in Europe (UK, CH, BE, NO, Berlin/Brandenburg, PT)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -29,6 +29,9 @@ dependencies = [
     "pydantic>=2.6",
 ]
 
+[project.scripts]
+mcp-server-public-transport = "server:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.4.1",
@@ -39,6 +42,12 @@ dev = [
 [project.urls]
 Homepage = "https://github.com/mirodn/mcp-server-public-transport"
 Repository = "https://github.com/mirodn/mcp-server-public-transport"
+
+# flat layout: setuptools skips a top-level "tools" package and single modules
+# during auto-discovery, so list everything the server needs explicitly
+[tool.setuptools]
+packages = ["core", "tools"]
+py-modules = ["server", "config"]
 
 [dependency-groups]
 dev = [

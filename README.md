@@ -108,7 +108,25 @@ UK_TRANSPORT_API_KEY=your_uk_api_key
 
 ### Usage with Claude Desktop
 
-Add to your claude_desktop_config.json`:
+The quickest way is to run the published package with `uvx` (no clone needed).
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "mcp-server-public-transport": {
+      "command": "uvx",
+      "args": ["mcp-server-public-transport"],
+      "env": {
+        "UK_TRANSPORT_APP_ID": "your-uk-app-id",
+        "UK_TRANSPORT_API_KEY": "your-uk-api-key"
+      }
+    }
+  }
+}
+```
+
+To run from a local clone instead:
 
 ```json
 {
