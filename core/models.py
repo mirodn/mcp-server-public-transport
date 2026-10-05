@@ -7,10 +7,14 @@ answers in the same shape and with a fraction of the tokens.
 """
 
 import re
-from datetime import datetime
+from datetime import datetime, tzinfo
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
+
+
+# shared by every tool that offers the compact format
+RAW_FIELD = Field(description="Return the unmodified upstream API response instead of the compact format.")
 
 
 class Stop(BaseModel):
@@ -46,6 +50,24 @@ class DepartureBoard(BaseModel):
     departures: List[Departure]
 
 
+class Arrival(BaseModel):
+    line: Optional[str] = None
+    category: Optional[str] = None
+    origin: Optional[str] = Field(None, description="Where the trip started")
+    planned: Optional[str] = None
+    expected: Optional[str] = None
+    delay_min: Optional[int] = None
+    platform: Optional[str] = None
+    cancelled: Optional[bool] = None
+    operator: Optional[str] = None
+    remarks: List[str] = []
+
+
+class ArrivalBoard(BaseModel):
+    station: Stop
+    arrivals: List[Arrival]
+
+
 class Leg(BaseModel):
     walk: bool = False
     line: Optional[str] = None
@@ -63,9 +85,14 @@ class Journey(BaseModel):
     duration_min: Optional[int] = Field(None, description="Scheduled travel time in minutes")
     transfers: int = 0
     legs: List[Leg]
+    remarks: List[str] = Field([], description="Alerts affecting the whole journey")
 
 
-def journey_from_legs(legs: List[Leg], transfers: Optional[int] = None) -> Journey:
+def journey_from_legs(
+    legs: List[Leg],
+    transfers: Optional[int] = None,
+    remarks: Optional[List[str]] = None,
+) -> Journey:
     """
     Build a Journey whose times come from the schedule of its first and last leg.
 
@@ -83,6 +110,7 @@ def journey_from_legs(legs: List[Leg], transfers: Optional[int] = None) -> Journ
         duration_min=minutes_between(departure, arrival),
         transfers=transfers,
         legs=legs,
+        remarks=remarks or [],
     )
 
 
@@ -121,6 +149,20 @@ def iso(value: Optional[str]) -> Optional[str]:
     """Normalize a timestamp to ISO 8601 with a colon offset; pass through if unparseable."""
     parsed = parse_time(value)
     return parsed.isoformat() if parsed else value
+
+
+def from_timestamp(value: Any, tz: tzinfo) -> Optional[str]:
+    """Convert unix seconds (int or numeric string) to ISO 8601 in the given zone."""
+    try:
+        return datetime.fromtimestamp(int(value), tz).isoformat()
+    except (TypeError, ValueError):
+        return None
+
+
+def to_zone(value: Optional[str], tz: tzinfo) -> Optional[str]:
+    """Express an ISO 8601 timestamp (e.g. UTC 'Z') in local time."""
+    parsed = parse_time(value)
+    return parsed.astimezone(tz).isoformat() if parsed else value
 
 
 def minutes_between(start: Optional[str], end: Optional[str]) -> Optional[int]:

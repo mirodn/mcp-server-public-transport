@@ -46,9 +46,19 @@ JOURNEYS = {
     ],
 }
 
+ARRIVALS = {
+    "arrivals": [
+        {"stop": ALEX, "when": "2026-10-05T10:29:00+02:00", "plannedWhen": "2026-10-05T10:27:00+02:00",
+         "platform": "4", "plannedPlatform": "4", "direction": None, "provenance": "S Strausberg Nord",
+         "line": {"name": "S5", "productName": "S"}, "remarks": [HINT]},
+    ],
+}
+
 @pytest.fixture(autouse=True)
 def mock_fetch_json(monkeypatch):
     async def dummy(url, params, **kwargs):
+        if url.endswith("/arrivals"):
+            return ARRIVALS
         if url.endswith("/departures"):
             return DEPARTURES
         if url.endswith("/journeys"):
@@ -91,6 +101,13 @@ class TestVBBTools:
         assert "cancelled" not in tram
 
     @pytest.mark.unit
+    async def test_vbb_get_departures_trims_to_results(self, mcp):
+        # HAFAS treats results as a rough target and may return more
+        fn = await get_tool(mcp, "vbb_get_departures")
+        result = await fn.fn("900100003", results=1)
+        assert len(result["departures"]) == 1
+
+    @pytest.mark.unit
     async def test_vbb_get_departures_raw(self, mcp):
         fn = await get_tool(mcp, "vbb_get_departures")
         assert await fn.fn("900100003", raw=True) == DEPARTURES
@@ -99,7 +116,25 @@ class TestVBBTools:
     async def test_vbb_get_arrivals(self, mcp):
         fn = await get_tool(mcp, "vbb_get_arrivals")
         result = await fn.fn("900100003", duration=10)
-        assert result == {"dummy": True}
+        assert result == {
+            "station": {"id": "900100003", "name": "S+U Alexanderplatz Bhf (Berlin)"},
+            "arrivals": [
+                {
+                    "line": "S5",
+                    "category": "S",
+                    "origin": "S Strausberg Nord",
+                    "planned": "2026-10-05T10:27:00+02:00",
+                    "expected": "2026-10-05T10:29:00+02:00",
+                    "delay_min": 2,
+                    "platform": "4",
+                }
+            ],
+        }
+
+    @pytest.mark.unit
+    async def test_vbb_get_arrivals_raw(self, mcp):
+        fn = await get_tool(mcp, "vbb_get_arrivals")
+        assert await fn.fn("900100003", raw=True) == ARRIVALS
 
     @pytest.mark.unit
     async def test_vbb_search_journeys(self, mcp):

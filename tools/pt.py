@@ -38,6 +38,19 @@ from core.base import (
     CACHE_TTL_PLAN,
     CACHE_TTL_STATIC,
 )
+from core.models import (
+    RAW_FIELD,
+    Departure,
+    DepartureBoard,
+    JourneyList,
+    Leg,
+    Stop,
+    StopTime,
+    compact,
+    journey_from_legs,
+    minutes_between,
+    to_zone,
+)
 from config import PT_BASE_URL
 
 logger = logging.getLogger(__name__)
@@ -79,6 +92,60 @@ def _to_iso(date: Optional[str], time: Optional[str]) -> Optional[str]:
 def _pt_only(hits: List[Dict[str, Any]], limit: int) -> List[Dict[str, Any]]:
     """Keep Portuguese hits only and trim. geocode is global so we filter here."""
     return [h for h in hits if h.get("country") == "PT"][:limit]
+
+
+def _pt_stop(place: Dict[str, Any]) -> Stop:
+    # legs reference platform-level stops ("..._MP1"); the parent id is what the tools accept
+    return Stop(id=place.get("parentId") or place.get("stopId"), name=place.get("name"))
+
+
+def _pt_stop_time(place: Dict[str, Any], kind: str, realtime: bool) -> StopTime:
+    """Map a MOTIS place; kind is 'departure' or 'arrival'. Times come in UTC."""
+    planned = to_zone(place.get("scheduled" + kind.capitalize()) or place.get(kind), PT_TZ)
+    expected = to_zone(place.get(kind), PT_TZ) if realtime else None
+    return StopTime(
+        stop=_pt_stop(place),
+        planned=planned,
+        expected=expected,
+        delay_min=minutes_between(planned, expected) if expected else None,
+        platform=place.get("track") or place.get("scheduledTrack"),
+    )
+
+
+def _pt_line(item: Dict[str, Any]) -> Dict[str, Optional[str]]:
+    mode = item.get("mode")
+    return {
+        "line": item.get("displayName") or item.get("routeShortName") or None,
+        "category": mode.title() if mode else None,
+    }
+
+
+def _pt_departure(stop_time: Dict[str, Any]) -> Departure:
+    at_stop = _pt_stop_time(stop_time.get("place") or {}, "departure", bool(stop_time.get("realTime")))
+    return Departure(
+        **_pt_line(stop_time),
+        destination=stop_time.get("headsign"),
+        planned=at_stop.planned,
+        expected=at_stop.expected,
+        delay_min=at_stop.delay_min,
+        platform=at_stop.platform,
+        cancelled=bool(stop_time.get("cancelled") or stop_time.get("tripCancelled")) or None,
+        operator=stop_time.get("agencyName") or None,
+    )
+
+
+def _pt_leg(leg: Dict[str, Any]) -> Leg:
+    realtime = bool(leg.get("realTime"))
+    walk = leg.get("mode") == "WALK"
+    line = {"line": None, "category": None} if walk else _pt_line(leg)
+    return Leg(
+        walk=walk,
+        **line,
+        direction=None if walk else leg.get("headsign"),
+        departure=_pt_stop_time(leg.get("from") or {}, "departure", realtime),
+        arrival=_pt_stop_time(leg.get("to") or {}, "arrival", realtime),
+        cancelled=bool(leg.get("cancelled")) or None,
+    )
 
 
 def register_pt_tools(mcp):
@@ -126,7 +193,8 @@ def register_pt_tools(mcp):
         description=(
             "Plan a public transport connection between two points in the Lisbon or Porto "
             "metro area. Origin and destination are either stop ids (from pt_search_stations) "
-            "or 'lat,lon' coordinates. Returns itineraries with legs, lines, times and transfers. "
+            "or 'lat,lon' coordinates. Returns a compact list of journeys with legs, lines, local "
+            "times and transfers; set raw=true for the full upstream response. "
             + _ATTRIBUTION
         ),
     )
@@ -155,6 +223,7 @@ def register_pt_tools(mcp):
             Optional[bool],
             Field(description="If true, interpret date/time as arrival time (default false)."),
         ] = False,
+        raw: Annotated[bool, RAW_FIELD] = False,
     ) -> Dict[str, Any]:
         origin_clean = origin.strip()
         destination_clean = destination.strip()
@@ -175,10 +244,20 @@ def register_pt_tools(mcp):
 
         try:
             logger.info("Planning PT connection: %s -> %s", origin_clean, destination_clean)
-            return await fetch_json(f"{PT_BASE_URL}/plan", params, cache_ttl=CACHE_TTL_PLAN)
+            data = await fetch_json(f"{PT_BASE_URL}/plan", params, cache_ttl=CACHE_TTL_PLAN)
         except TransportAPIError as e:
             logger.error("PT connection search failed: %s", e)
             raise
+
+        if raw:
+            return data
+        # numItineraries is a minimum for MOTIS, so trim to what was asked for
+        itineraries = (data.get("itineraries") or [])[: int(limit or 4)]
+        journeys = [
+            journey_from_legs([_pt_leg(leg) for leg in it.get("legs") or []], transfers=it.get("transfers"))
+            for it in itineraries
+        ]
+        return compact(JourneyList(journeys=journeys))
 
     @mcp.tool(
         name="pt_get_departures",
@@ -186,7 +265,8 @@ def register_pt_tools(mcp):
         description=(
             "Get the departure board for a stop in the Lisbon or Porto metro area. "
             "Needs a stop id from pt_search_stations. Returns upcoming departures with "
-            "line, headsign and real-time times. "
+            "line, headsign and real-time times in local time; set raw=true for the full "
+            "upstream response. "
             + _ATTRIBUTION
         ),
     )
@@ -203,6 +283,7 @@ def register_pt_tools(mcp):
             Optional[str],
             Field(description="Date/time as rfc3339 (optional). Default: now."),
         ] = None,
+        raw: Annotated[bool, RAW_FIELD] = False,
     ) -> Dict[str, Any]:
         stop_id_clean = stop_id.strip()
         if not stop_id_clean:
@@ -218,10 +299,19 @@ def register_pt_tools(mcp):
 
         try:
             logger.info("Getting PT departures for stop: %s", stop_id_clean)
-            return await fetch_json(f"{PT_BASE_URL}/stoptimes", params, cache_ttl=CACHE_TTL_LIVE)
+            data = await fetch_json(f"{PT_BASE_URL}/stoptimes", params, cache_ttl=CACHE_TTL_LIVE)
         except TransportAPIError as e:
             logger.error("PT departures fetch failed: %s", e)
             raise
+
+        if raw:
+            return data
+        board = DepartureBoard(
+            station=_pt_stop(data.get("place") or {"stopId": stop_id_clean}),
+            # n is a minimum for MOTIS, so trim to what was asked for
+            departures=[_pt_departure(st) for st in (data.get("stopTimes") or [])[: int(limit or 10)]],
+        )
+        return compact(board)
 
     @mcp.tool(
         name="pt_nearby_stations",

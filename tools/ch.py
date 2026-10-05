@@ -20,6 +20,7 @@ from core.base import (
     CACHE_TTL_STATIC,
 )
 from core.models import (
+    RAW_FIELD,
     Departure,
     DepartureBoard,
     Journey,
@@ -35,9 +36,6 @@ from core.models import (
 from config import CH_BASE_URL
 
 logger = logging.getLogger(__name__)
-
-_RAW_FIELD = Field(description="Return the unmodified upstream API response instead of the compact format.")
-
 
 def _ch_line(journey: Dict[str, Any]) -> Optional[str]:
     number = journey.get("number")
@@ -138,7 +136,7 @@ def register_ch_tools(mcp):
             Optional[bool],
             Field(description="If true, interpret 'time' as arrival time (default false)."),
         ] = False,
-        raw: Annotated[bool, _RAW_FIELD] = False,
+        raw: Annotated[bool, RAW_FIELD] = False,
     ) -> Dict[str, Any]:
         origin_clean = validate_station_name(origin)
         destination_clean = validate_station_name(destination)
@@ -220,7 +218,7 @@ def register_ch_tools(mcp):
             Optional[str],
             Field(description="Datetime ISO string supported by API (optional)."),
         ] = None,
-        raw: Annotated[bool, _RAW_FIELD] = False,
+        raw: Annotated[bool, RAW_FIELD] = False,
     ) -> Dict[str, Any]:
         station_clean = validate_station_name(station)
 

@@ -22,6 +22,19 @@ import logging
 from pydantic import Field
 from typing_extensions import Annotated
 
+from core.models import (
+    RAW_FIELD,
+    Departure,
+    DepartureBoard,
+    JourneyList,
+    Leg,
+    Stop,
+    StopTime,
+    compact,
+    journey_from_legs,
+    minutes_between,
+    strip_html,
+)
 from core.base import (
     CACHE_TTL_LIVE,
     CACHE_TTL_PLAN,
@@ -64,6 +77,88 @@ async def _post_graphql(
 
 
 # -----------------------------------------------------------------------------
+# Mapping to the compact models
+# -----------------------------------------------------------------------------
+SITUATIONS_FIELDS = "situations { summary { value language } description { value language } }"
+
+
+def _no_text(strings: list[dict] | None) -> str | None:
+    """Pick English from an Entur multilingual list, else the first entry."""
+    strings = strings or []
+    for entry in strings:
+        if entry.get("language") == "en" and entry.get("value"):
+            return entry["value"]
+    return next((e.get("value") for e in strings if e.get("value")), None)
+
+
+def _no_situations(situations: list[dict] | None) -> list[str]:
+    texts: list[str] = []
+    for situation in situations or []:
+        parts = [_no_text(situation.get("summary")), _no_text(situation.get("description"))]
+        text = strip_html(": ".join(p for p in parts if p))
+        if text and text not in texts:
+            texts.append(text)
+    return texts
+
+
+def _no_line(line: dict | None) -> dict[str, str | None]:
+    line = line or {}
+    return {
+        "line": line.get("publicCode") or line.get("name"),
+        "category": line.get("transportMode"),
+        "operator": (line.get("operator") or {}).get("name"),
+    }
+
+
+def _no_times(planned: str | None, expected: str | None, realtime: bool) -> dict:
+    # Entur repeats the aimed time as "expected" without real-time data; drop it then
+    expected = expected if realtime else None
+    return {
+        "planned": planned,
+        "expected": expected,
+        "delay_min": minutes_between(planned, expected) if expected else None,
+    }
+
+
+def _no_departure(call: dict) -> Departure:
+    journey = call.get("serviceJourney") or {}
+    return Departure(
+        **_no_line(journey.get("line")),
+        destination=(call.get("destinationDisplay") or {}).get("frontText"),
+        **_no_times(call.get("aimedDepartureTime"), call.get("expectedDepartureTime"), bool(call.get("realtime"))),
+        platform=(call.get("quay") or {}).get("publicCode") or None,
+        cancelled=call.get("cancellation") or None,
+        remarks=_no_situations(call.get("situations")),
+    )
+
+
+def _no_stop_time(place: dict | None, planned: str | None, expected: str | None, realtime: bool) -> StopTime:
+    place = place or {}
+    quay = place.get("quay") or {}
+    return StopTime(
+        stop=Stop(id=(quay.get("stopPlace") or {}).get("id"), name=place.get("name")),
+        **_no_times(planned, expected, realtime),
+        platform=quay.get("publicCode") or None,
+    )
+
+
+def _no_leg(leg: dict) -> Leg:
+    walk = leg.get("mode") == "foot"
+    realtime = bool(leg.get("realtime"))
+    line = _no_line(leg.get("line"))
+    return Leg(
+        walk=walk,
+        line=None if walk else line["line"],
+        category=None if walk else line["category"],
+        direction=((leg.get("fromEstimatedCall") or {}).get("destinationDisplay") or {}).get("frontText"),
+        departure=_no_stop_time(leg.get("fromPlace"), leg.get("aimedStartTime"), leg.get("expectedStartTime"), realtime),
+        arrival=_no_stop_time(leg.get("toPlace"), leg.get("aimedEndTime"), leg.get("expectedEndTime"), realtime),
+        cancelled=(leg.get("fromEstimatedCall") or {}).get("cancellation") or None,
+        remarks=_no_situations(leg.get("situations")),
+    )
+
+
+# -----------------------------------------------------------------------------
 # Tool registration
 # -----------------------------------------------------------------------------
 def register_no_tools(mcp):
@@ -95,11 +190,15 @@ def register_no_tools(mcp):
     @mcp.tool(
         name="no_stop_departures",
         annotations=READ_ONLY_TOOL,
-        description="Upcoming departures for a StopPlace ID (e.g., 'NSR:StopPlace:58368').",
+        description=(
+            "Upcoming departures for a StopPlace ID (e.g., 'NSR:StopPlace:58368') with planned/expected "
+            "time, delay, platform and disruptions. Set raw=true for the full upstream response."
+        ),
     )
     async def no_stop_departures(
         stop_place_id: Annotated[str, Field(description="NSR StopPlace ID. Example: 'NSR:StopPlace:58368'", min_length=1)],
         limit: Annotated[int | None, Field(description="Number of departures to fetch (default 10).", ge=1, le=50)] = 10,
+        raw: Annotated[bool, RAW_FIELD] = False,
     ) -> dict[str, object]:
         if not stop_place_id or not stop_place_id.strip():
             raise ValueError("Parameter 'stop_place_id' must not be empty.")
@@ -111,32 +210,51 @@ def register_no_tools(mcp):
             name
             estimatedCalls(numberOfDepartures: $limit) {
               realtime
+              cancellation
               aimedDepartureTime
               expectedDepartureTime
               destinationDisplay { frontText }
-              quay { id name }
+              quay { id name publicCode }
+              %s
               serviceJourney {
                 id
-                line { id name publicCode transportMode }
+                line { id name publicCode transportMode operator { name } }
               }
             }
           }
         }
-        """
+        """ % SITUATIONS_FIELDS
         variables = {"id": stop_place_id.strip(), "limit": int(limit or 10)}
         logger.info("Entur stop departures: %s (limit=%s)", variables["id"], variables["limit"])
-        return await _post_graphql(query, variables, cache_ttl=CACHE_TTL_LIVE)
+        data = await _post_graphql(query, variables, cache_ttl=CACHE_TTL_LIVE)
+        if raw:
+            return data
+
+        stop_place = data.get("stopPlace")
+        if not stop_place:
+            raise ValueError(
+                f"Unknown StopPlace id {variables['id']!r}. Look up the id with no_search_places first."
+            )
+        board = DepartureBoard(
+            station=Stop(id=stop_place.get("id"), name=stop_place.get("name")),
+            departures=[_no_departure(c) for c in stop_place.get("estimatedCalls") or []],
+        )
+        return compact(board)
 
     @mcp.tool(
         name="no_trip",
         annotations=READ_ONLY_TOOL,
-        description="Door-to-door trip planning between two StopPlaces (NSR IDs).",
+        description=(
+            "Door-to-door trip planning between two StopPlaces (NSR IDs). Returns a compact list of "
+            "journeys with legs, platforms and disruptions; set raw=true for the full upstream response."
+        ),
     )
     async def no_trip(
         from_id: Annotated[str, Field(description="Origin StopPlace NSR ID. Example: 'NSR:StopPlace:58368'", min_length=1)],
         to_id: Annotated[str, Field(description="Destination StopPlace NSR ID.", min_length=1)],
         date_time: Annotated[str | None, Field(description="ISO 8601 datetime (optional). Example: '2026-01-30T12:00:00+01:00'")] = None,
         results: Annotated[int | None, Field(description="Number of trip patterns (default 5).", ge=1, le=10)] = 5,
+        raw: Annotated[bool, RAW_FIELD] = False,
     ) -> dict[str, object]:
         if not from_id or not to_id:
             raise ValueError("'from_id' and 'to_id' are required.")
@@ -155,18 +273,21 @@ def register_no_tools(mcp):
               legs {
                 mode
                 distance
+                realtime
                 aimedStartTime
                 expectedStartTime
                 aimedEndTime
                 expectedEndTime
-                fromPlace { name }
-                toPlace { name }
-                line { id name publicCode transportMode }
+                fromPlace { name quay { id publicCode stopPlace { id } } }
+                toPlace { name quay { id publicCode stopPlace { id } } }
+                line { id name publicCode transportMode operator { name } }
+                fromEstimatedCall { destinationDisplay { frontText } cancellation }
+                %s
               }
             }
           }
         }
-        """
+        """ % SITUATIONS_FIELDS
         variables = {
             "from": from_id.strip(),
             "to": to_id.strip(),
@@ -177,7 +298,13 @@ def register_no_tools(mcp):
             "🇳🇴 Entur trip: %s -> %s (results=%s, dateTime=%s)",
             variables["from"], variables["to"], variables["results"], variables["dateTime"]
         )
-        return await _post_graphql(query, variables, cache_ttl=CACHE_TTL_PLAN)
+        data = await _post_graphql(query, variables, cache_ttl=CACHE_TTL_PLAN)
+        if raw:
+            return data
+
+        patterns = (data.get("trip") or {}).get("tripPatterns") or []
+        journeys = [journey_from_legs([_no_leg(leg) for leg in p.get("legs") or []]) for p in patterns]
+        return compact(JourneyList(journeys=journeys))
 
     @mcp.tool(
         name="no_nearest_stops",

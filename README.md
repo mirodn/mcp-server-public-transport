@@ -70,6 +70,31 @@ OpenStreetMap, are listed at [transitous.org/sources](https://transitous.org/sou
 Follow the [Transitous usage policy](https://transitous.org/api/): modest request volume,
 an identifying `User-Agent`, non-commercial / open-source use only.
 
+## Response Format
+
+Departure/arrival boards and connection searches return a compact format that is the
+same for every country, instead of the raw upstream payload (typically 80–95% smaller):
+
+```json
+{
+  "station": {"id": "8503000", "name": "Zürich HB"},
+  "departures": [
+    {"line": "S 14", "category": "S", "destination": "Hinwil",
+     "planned": "2026-10-05T10:12:00+02:00", "expected": "2026-10-05T10:36:00+02:00",
+     "delay_min": 24, "platform": "33", "operator": "SBB"}
+  ]
+}
+```
+
+- Times are ISO 8601 in local time. `expected` is only set when real-time data exists.
+- Journeys contain `legs` (with `walk: true` for footpaths); `departure`, `arrival` and
+  `duration_min` of a journey are scheduled values, real-time data is on the legs.
+- Disruption messages appear in `remarks`. Empty fields are omitted.
+- Pass `raw: true` to get the unmodified upstream response.
+
+Station searches, nearby lookups, `be_get_vehicle` and `uk_live_departures` still return
+the upstream payload.
+
 ## Setup
 
 ### Environment Variables

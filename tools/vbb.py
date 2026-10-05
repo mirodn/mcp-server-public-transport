@@ -27,6 +27,9 @@ from core.base import (
     CACHE_TTL_STATIC,
 )
 from core.models import (
+    RAW_FIELD,
+    Arrival,
+    ArrivalBoard,
     Departure,
     DepartureBoard,
     JourneyList,
@@ -41,9 +44,6 @@ from core.models import (
 from config import VBB_BASE_URL
 
 logger = logging.getLogger(__name__)
-
-_RAW_FIELD = Field(description="Return the unmodified upstream API response instead of the compact format.")
-
 
 def _vbb_stop(stop: Optional[Dict[str, Any]]) -> Stop:
     stop = stop or {}
@@ -88,6 +88,21 @@ def _vbb_departure(entry: Dict[str, Any]) -> Departure:
     return Departure(
         **_vbb_line(entry.get("line")),
         destination=entry.get("direction"),
+        planned=planned,
+        expected=expected,
+        delay_min=minutes_between(planned, expected) if expected else None,
+        platform=entry.get("platform") or entry.get("plannedPlatform"),
+        cancelled=entry.get("cancelled") or None,
+        remarks=_vbb_warnings(entry.get("remarks")),
+    )
+
+
+def _vbb_arrival(entry: Dict[str, Any]) -> Arrival:
+    planned = entry.get("plannedWhen")
+    expected = entry.get("when")
+    return Arrival(
+        **_vbb_line(entry.get("line")),
+        origin=entry.get("provenance"),
         planned=planned,
         expected=expected,
         delay_min=minutes_between(planned, expected) if expected else None,
@@ -205,7 +220,7 @@ def register_vbb_tools(mcp):
             Optional[str],
             Field(description="Filter departures by direction (stop ID)."),
         ] = None,
-        raw: Annotated[bool, _RAW_FIELD] = False,
+        raw: Annotated[bool, RAW_FIELD] = False,
     ) -> Dict[str, Any]:
         stop_id_clean = stop_id.strip()
         if not stop_id_clean:
@@ -231,7 +246,8 @@ def register_vbb_tools(mcp):
 
         if raw:
             return data
-        entries = data.get("departures") or []
+        # HAFAS treats `results` as a rough target, so trim to what was asked for
+        entries = (data.get("departures") or [])[: results or None]
         station = _vbb_stop(entries[0].get("stop")) if entries else Stop(id=stop_id_clean)
         board = DepartureBoard(station=station, departures=[_vbb_departure(e) for e in entries])
         return compact(board)
@@ -241,7 +257,8 @@ def register_vbb_tools(mcp):
         annotations=READ_ONLY_TOOL,
         description=(
             "Get arrivals at a stop/station in Berlin/Brandenburg. "
-            "Returns real-time arrival information including delays, platform, and line details."
+            "Returns real-time arrival information including delays, platform, line details "
+            "and disruption warnings. Set raw=true for the full upstream response."
         ),
     )
     async def vbb_get_arrivals(
@@ -261,6 +278,7 @@ def register_vbb_tools(mcp):
             Optional[int],
             Field(description="Max number of arrivals.", ge=1, le=100),
         ] = None,
+        raw: Annotated[bool, RAW_FIELD] = False,
     ) -> Dict[str, Any]:
         stop_id_clean = stop_id.strip()
         if not stop_id_clean:
@@ -277,10 +295,18 @@ def register_vbb_tools(mcp):
 
         try:
             logger.info("Getting VBB arrivals for stop: %s", stop_id_clean)
-            return await fetch_json(f"{VBB_BASE_URL}/stops/{stop_id_clean}/arrivals", params, cache_ttl=CACHE_TTL_LIVE)
+            data = await fetch_json(f"{VBB_BASE_URL}/stops/{stop_id_clean}/arrivals", params, cache_ttl=CACHE_TTL_LIVE)
         except TransportAPIError as e:
             logger.error("VBB arrivals fetch failed: %s", e)
             raise
+
+        if raw:
+            return data
+        # HAFAS treats `results` as a rough target, so trim to what was asked for
+        entries = (data.get("arrivals") or [])[: results or None]
+        station = _vbb_stop(entries[0].get("stop")) if entries else Stop(id=stop_id_clean)
+        board = ArrivalBoard(station=station, arrivals=[_vbb_arrival(e) for e in entries])
+        return compact(board)
 
     @mcp.tool(
         name="vbb_search_journeys",
@@ -317,7 +343,7 @@ def register_vbb_tools(mcp):
             Optional[int],
             Field(description="Maximum number of transfers.", ge=0, le=10),
         ] = None,
-        raw: Annotated[bool, _RAW_FIELD] = False,
+        raw: Annotated[bool, RAW_FIELD] = False,
     ) -> Dict[str, Any]:
         origin_clean = origin.strip()
         destination_clean = destination.strip()
@@ -349,8 +375,11 @@ def register_vbb_tools(mcp):
         if raw:
             return data
         journeys = [
-            journey_from_legs([_vbb_leg(leg) for leg in j.get("legs") or []])
-            for j in data.get("journeys") or []
+            journey_from_legs(
+                [_vbb_leg(leg) for leg in j.get("legs") or []],
+                remarks=_vbb_warnings(j.get("remarks")),
+            )
+            for j in (data.get("journeys") or [])[: results or None]
         ]
         return compact(JourneyList(journeys=journeys))
 
