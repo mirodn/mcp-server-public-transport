@@ -210,6 +210,20 @@ The project includes a GitHub Actions workflow (`.github/workflows/test.yml`) th
 
 The CI pipeline ensures code quality and compatibility across supported Python versions before any changes are merged.
 
+### Hosting (Google Cloud Run)
+
+The hosted instance runs on Cloud Run with stateless Streamable HTTP (`MCP_STATELESS=true`),
+scale-to-zero and a single max instance. A monthly budget triggers
+[`deploy/budget-guard`](deploy/budget-guard/main.py), which makes the service private
+once the budget is used up.
+
+The hosted instance has no UK credentials, so UK tools are not available there. To use them,
+get your own key at [transportapi.com](https://transportapi.com) and run the server locally (see [Setup](#setup)).
+
+- One-time setup: [`deploy/gcp-setup.sh`](deploy/gcp-setup.sh)
+- Deploys: [`.github/workflows/deploy-cloudrun.yml`](.github/workflows/deploy-cloudrun.yml)
+  runs on release tags or manually. It only swaps the image, so limits and public access stay as configured.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.

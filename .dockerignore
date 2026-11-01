@@ -1,0 +1,20 @@
+# Secrets: never bake local keys into the image
+.env
+.env.*
+
+# Local tooling / caches
+.git
+.github
+.claude
+.venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+*.egg-info
+build
+dist
+
+# Not needed at runtime
+test
+deploy

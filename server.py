@@ -27,9 +27,18 @@ def main():
         help="Transport method: stdio (default), sse, or http"
     )
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind for HTTP/SSE transports")
-    parser.add_argument("--port", type=int, default=8080, help="Port for HTTP/SSE transport")
+    # Hosting platforms (Cloud Run, Render, ...) inject the port via $PORT
+    parser.add_argument("--port", type=int, default=int(os.getenv("PORT", "8080")), help="Port for HTTP/SSE transport")
     # Optional: default to '/mcp/' to avoid 307 redirects
     parser.add_argument("--path", type=str, default="/mcp", help="Path for HTTP/SSE transport")
+    # Stateless HTTP: no in-memory sessions and no long-lived streams, needed when
+    # running behind a load balancer with multiple / scale-to-zero instances
+    parser.add_argument(
+        "--stateless",
+        action="store_true",
+        default=os.getenv("MCP_STATELESS", "").lower() in ("1", "true", "yes"),
+        help="Use stateless Streamable HTTP (http transport only)"
+    )
     parser.add_argument(
         "--log-level",
         default=os.getenv("LOG_LEVEL", "INFO"),
@@ -79,8 +88,9 @@ def main():
         logger.info(f"Starting MCP server on SSE at http://{args.host}:{args.port}{args.path}")
         mcp.run(transport="sse", host=args.host, port=args.port, path=args.path)
     else:  # http (Streamable HTTP)
-        logger.info(f"Starting MCP server on HTTP-Stream at http://{args.host}:{args.port}{args.path}")
-        mcp.run(transport="http", host=args.host, port=args.port, path=args.path)
+        mode = "stateless " if args.stateless else ""
+        logger.info(f"Starting MCP server on {mode}HTTP-Stream at http://{args.host}:{args.port}{args.path}")
+        mcp.run(transport="http", host=args.host, port=args.port, path=args.path, stateless_http=args.stateless)
 
 if __name__ == "__main__":
     main()
