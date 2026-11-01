@@ -97,6 +97,19 @@ the upstream payload.
 
 ## Setup
 
+### Hosted Server (no install)
+
+A public instance is available via Streamable HTTP:
+
+```plaintext
+https://mcp-public-transport-412652413053.europe-west1.run.app/mcp
+```
+
+- **Claude (web / desktop):** Settings → Connectors → Add custom connector, paste the URL.
+- **Claude Code:** `claude mcp add --transport http public-transport https://mcp-public-transport-412652413053.europe-west1.run.app/mcp`
+
+The hosted instance does not include UK tools. For UK data, run the server locally with your own keys (see below).
+
 ### Environment Variables
 
 Set the following environment variables:
