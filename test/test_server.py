@@ -4,6 +4,7 @@ from fastmcp import FastMCP
 from tools import (
     register_be_tools,
     register_ch_tools,
+    register_it_tools,
     register_no_tools,
     register_pt_tools,
     register_uk_tools,
@@ -13,6 +14,7 @@ from tools import (
 ALL_PROVIDERS = [
     register_be_tools,
     register_ch_tools,
+    register_it_tools,
     register_no_tools,
     register_pt_tools,
     register_uk_tools,
