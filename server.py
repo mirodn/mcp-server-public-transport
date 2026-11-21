@@ -12,6 +12,7 @@ from tools.be import register_be_tools
 from tools.no import register_no_tools
 from tools.vbb import register_vbb_tools
 from tools.pt import register_pt_tools
+from tools.it import register_it_tools
 from config import SERVER_NAME
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,7 @@ def main():
     no_tools = register_no_tools(mcp)
     vbb_tools = register_vbb_tools(mcp)
     pt_tools = register_pt_tools(mcp)
+    it_tools = register_it_tools(mcp)
 
     uk_app_id = os.getenv("UK_TRANSPORT_APP_ID")
     uk_api_key = os.getenv("UK_TRANSPORT_API_KEY")
@@ -75,10 +77,10 @@ def main():
         else:
             logger.info("UK tools disabled via --disable-uk")
 
-    total = len(ch_tools) + len(uk_tools) + len(be_tools) + len(no_tools) + len(vbb_tools) + len(pt_tools)
+    total = len(ch_tools) + len(uk_tools) + len(be_tools) + len(no_tools) + len(vbb_tools) + len(pt_tools) + len(it_tools)
     logger.info(f"{SERVER_NAME} initialized with {total} tools "
                 f"(CH: {len(ch_tools)}, NO: {len(no_tools)}, UK: {len(uk_tools)}, BE: {len(be_tools)}, "
-                f"VBB: {len(vbb_tools)}, PT: {len(pt_tools)})")
+                f"VBB: {len(vbb_tools)}, PT: {len(pt_tools)}, IT: {len(it_tools)})")
 
     # Start transport
     if args.transport == "stdio":

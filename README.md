@@ -11,7 +11,7 @@ An MCP Server providing real-time public transport data across Europe.
 ## About
 
 mcp-server-public-transport is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction)-compatible local server that provides access to public transport data across Europe.
-Currently, it integrates APIs from UK, Switzerland, Norway, Belgium, Berlin/Brandenburg and Portugal (Lisbon + Porto), allowing you to retrieve train connections, live departures, and bus locations.
+Currently, it integrates APIs from UK, Switzerland, Norway, Belgium, Berlin/Brandenburg, Portugal (Lisbon + Porto) and Italy, allowing you to retrieve train connections, live departures, and bus locations.
 
 ## Feature Implementation Status
 
@@ -25,6 +25,7 @@ Currently, it integrates APIs from UK, Switzerland, Norway, Belgium, Berlin/Bran
 | **Norway**            | [https://api.entur.io](https://api.entur.io)                     | ✅    |
 | **Berlin/Brandenburg**| [https://v6.vbb.transport.rest](https://v6.vbb.transport.rest)   | ✅    |
 | **Portugal** (Lisbon + Porto) | [https://api.transitous.org](https://api.transitous.org)      | ✅    |
+| **Italy** (national)          | [https://api.transitous.org](https://api.transitous.org)      | ✅    |
 
 ### Features by Country
 
@@ -57,12 +58,19 @@ Currently, it integrates APIs from UK, Switzerland, Norway, Belgium, Berlin/Bran
 | Search Connections | `/plan` | ✅ |
 | Departure Board | `/stoptimes` | ✅ |
 | Nearby Stations | `/reverse-geocode` | ✅ |
+| **Italy** (national) | | |
+| Station Lookup | `/geocode` | ✅ |
+| Search Connections | `/plan` | ✅ |
+| Departure Board | `/stoptimes` | ✅ |
+| Nearby Stations | `/reverse-geocode` | ✅ |
 
 > Portugal coverage is scoped to the Lisbon and Porto metro areas (Metro Lisboa, Carris, Carris Metropolitana, CP suburban; Metro do Porto, STCP) via [Transitous](https://transitous.org), a free MOTIS instance over ingested GTFS feeds. No API key required.
 
+> Italy coverage is national: Trenitalia rail (high-speed, long-distance, regional, night) plus regional GTFS feeds (metro, tram, bus), also via [Transitous](https://transitous.org). No API key required.
+
 #### Attribution (Transitous)
 
-Lisbon/Porto data is served by [Transitous](https://transitous.org), a volunteer-run,
+Lisbon/Porto and Italy data is served by [Transitous](https://transitous.org), a volunteer-run,
 best-effort service (limited hosting, no availability or accuracy guarantees). Keep the
 Transitous attribution visible when showing this data to users; underlying feeds, including
 OpenStreetMap, are listed at [transitous.org/sources](https://transitous.org/sources/).
