@@ -58,7 +58,7 @@ def mock_fetch_json(monkeypatch):
         if url.endswith("/plan"):
             return PLAN
         return {"dummy": True}
-    monkeypatch.setattr("tools.pt.fetch_json", dummy)
+    monkeypatch.setattr("tools.transitous.fetch_json", dummy)
     return dummy
 
 async def get_tool(mcp, name):
@@ -113,6 +113,7 @@ class TestPTTools:
             "delay_min": 2,
             "operator": "Metro do Porto",
         }
+        # not realtime, so only the planned time is reported
         assert "expected" not in cancelled
         assert cancelled["cancelled"] is True
 
