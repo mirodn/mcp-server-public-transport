@@ -21,13 +21,9 @@ BE_BASE_URL = "https://api.irail.be"
 # Berlin/Brandenburg VBB API (v6.vbb.transport.rest)
 VBB_BASE_URL = "https://v6.vbb.transport.rest"
 
-# Portugal via Transitous (MOTIS routing over ingested GTFS feeds)
-# scoped to Lisbon + Porto metro areas, no auth
-PT_BASE_URL = "https://api.transitous.org/api/v1"
-
-# Italy via Transitous (same MOTIS instance as Portugal, national coverage:
-# Trenitalia rail + regional GTFS feeds), no auth
-IT_BASE_URL = "https://api.transitous.org/api/v1"
+# Transitous (MOTIS routing over ingested GTFS feeds, global coverage), no auth.
+# Shared by every Transitous-backed region (see tools/transitous.py): PT, IT
+TRANSITOUS_BASE_URL = "https://api.transitous.org/api/v1"
 
 # Server settings
 SERVER_NAME = "MCP Public Transport Server"

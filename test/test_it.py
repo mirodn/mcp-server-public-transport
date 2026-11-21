@@ -62,7 +62,7 @@ def mock_fetch_json(monkeypatch):
         if url.endswith("/plan"):
             return PLAN
         return {"dummy": True}
-    monkeypatch.setattr("tools.it.fetch_json", dummy)
+    monkeypatch.setattr("tools.transitous.fetch_json", dummy)
     return dummy
 
 async def get_tool(mcp, name):
@@ -118,6 +118,7 @@ class TestITTools:
             "platform": "9",
             "operator": "TRENITALIA",
         }
+        # not realtime, so only the planned time is reported
         assert "expected" not in cancelled
         assert cancelled["cancelled"] is True
 
@@ -138,3 +139,38 @@ class TestITTools:
         fn = await get_tool(mcp, "it_nearby_stations")
         result = await fn.fn(41.90050, 12.50203, results=8)
         assert result == [GEOCODE[0]]
+
+    @pytest.mark.unit
+    async def test_it_search_stations_scopes_upstream(self, mcp, monkeypatch):
+        # bbox keeps hits in Italy upstream; numResults over-fetches past the default 10
+        seen = {}
+        async def capture(url, params, **kwargs):
+            seen.update(params)
+            return GEOCODE
+        monkeypatch.setattr("tools.transitous.fetch_json", capture)
+        fn = await get_tool(mcp, "it_search_stations")
+        await fn.fn("Roma Termini", limit=20)
+        assert seen["numResults"] == 40
+        assert seen["min"] == "35.4,6.6"
+        assert seen["max"] == "47.1,18.6"
+
+    @pytest.mark.unit
+    async def test_it_nearby_stations_over_fetches(self, mcp, monkeypatch):
+        # reverse-geocode defaults to 5 hits, below our default of 8
+        seen = {}
+        async def capture(url, params, **kwargs):
+            seen.update(params)
+            return GEOCODE
+        monkeypatch.setattr("tools.transitous.fetch_json", capture)
+        fn = await get_tool(mcp, "it_nearby_stations")
+        await fn.fn(41.90050, 12.50203)
+        assert seen["numResults"] == 16
+
+    @pytest.mark.unit
+    async def test_it_search_stations_keeps_enclaves(self, mcp, monkeypatch):
+        hits = GEOCODE + [{"type": "STOP", "id": "sm-x", "name": "San Marino", "country": "SM"}]
+        async def dummy(url, params, **kwargs):
+            return hits
+        monkeypatch.setattr("tools.transitous.fetch_json", dummy)
+        fn = await get_tool(mcp, "it_search_stations")
+        assert [h["country"] for h in await fn.fn("San Marino")] == ["IT", "SM"]
